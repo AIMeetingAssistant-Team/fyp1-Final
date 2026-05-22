@@ -1,4 +1,5 @@
 import nodemailer from "nodemailer";
+import User from '../models/User.js';
 
 // Create transporter
 const createTransporter = () => {
@@ -7,7 +8,7 @@ const createTransporter = () => {
     auth: {
       user: process.env.SMTP_USER || process.env.EMAIL_USER,
       pass: process.env.SMTP_PASS || process.env.EMAIL_PASS,
-    }, 
+    },
   });
 };
 
@@ -17,7 +18,7 @@ const createTransporter = () => {
 export const sendEmail = async (to, subject, html) => {
   try {
     const transporter = createTransporter();
-    
+
     const mailOptions = {
       from: `"AI Meeting Assistant" <${process.env.SMTP_USER || process.env.EMAIL_USER}>`,
       to,
@@ -172,7 +173,7 @@ export const sendPasswordResetEmail = async (user, resetToken) => {
 export const sendMeetingInviteEmail = async (inviteeEmail, meeting, invite, customMessage = '') => {
   const { token } = invite;
   const baseUrl = process.env.CLIENT_URL || 'http://localhost:3000';
-  
+
   const acceptUrl = `${baseUrl}/meeting-invite/${token}?action=accept`;
   const declineUrl = `${baseUrl}/meeting-invite/${token}?action=decline`;
   const maybeUrl = `${baseUrl}/meeting-invite/${token}?action=maybe`;
@@ -282,7 +283,7 @@ export const sendMeetingInviteEmail = async (inviteeEmail, meeting, invite, cust
 export const generateMeetingInviteEmail = (meeting, invite, customMessage = '') => {
   const { invitedUser, token } = invite;
   const baseUrl = process.env.CLIENT_URL || 'http://localhost:3000';
-  
+
   const acceptUrl = `${baseUrl}/meeting-invite/${token}?action=accept`;
   const declineUrl = `${baseUrl}/meeting-invite/${token}?action=decline`;
   const maybeUrl = `${baseUrl}/meeting-invite/${token}?action=maybe`;
@@ -528,4 +529,97 @@ export const generateMeetingUpdateEmail = (meeting, invite, changes) => {
   `;
 };
 
+/**
+ * Send task deadline reminder email (6 hours before due)
+ */
+export const sendTaskDeadlineReminderEmail = async (task, assignedUser) => {
+  try {
+    const user = await User.findById(assignedUser);
+    if (!user || !user.email) return;
+
+    const frontendUrl = process.env.CLIENT_URL || 'http://localhost:3000';
+    const taskUrl = `${frontendUrl}/tasks`;
+
+    const formatDate = (date) => {
+      return new Date(date).toLocaleDateString('en-US', {
+        weekday: 'long', year: 'numeric', month: 'long',
+        day: 'numeric', hour: '2-digit', minute: '2-digit'
+      });
+    };
+
+    const endOfDueDate = new Date(task.dueDate);
+    endOfDueDate.setHours(23, 59, 59, 999);
+    const hoursLeft = Math.max(0, Math.round((endOfDueDate - new Date()) / (1000 * 60 * 60)));
+
+    const html = `
+    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f9fafb;">
+      <div style="background: white; border-radius: 8px; padding: 40px 30px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+
+        <div style="text-align: center; margin-bottom: 30px;">
+          <h1 style="color: #92400e; margin: 0; font-size: 24px; font-weight: 700;">Deadline Reminder</h1>
+          <p style="color: #b45309; margin: 8px 0 0 0; font-size: 15px;">
+            Your task is due in approximately <strong>${hoursLeft} hour${hoursLeft !== 1 ? 's' : ''}</strong>
+          </p>
+        </div>
+
+        <div style="background: #fffbeb; border: 1px solid #fde68a; border-radius: 8px; padding: 24px; margin-bottom: 28px;">
+          <h2 style="color: #92400e; margin: 0 0 16px 0; font-size: 18px;">${task.title}</h2>
+
+          ${task.description ? `
+          <p style="color: #78350f; margin: 0 0 16px 0; font-size: 14px;">${task.description}</p>
+          ` : ''}
+
+          <div style="display: grid; gap: 10px;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span style="color: #92400e; font-size: 14px; min-width: 100px;">⏰ Due:</span>
+              <span style="color: #78350f; font-weight: 600; font-size: 14px;">${formatDate(task.dueDate)}</span>
+            </div>
+
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span style="color: #92400e; font-size: 14px; min-width: 100px;">🚦 Priority:</span>
+              <span style="display: inline-block; padding: 3px 10px; border-radius: 20px; font-size: 12px; font-weight: 600; text-transform: uppercase;
+                ${task.priority === 'urgent' ? 'background:#fee2e2;color:#dc2626;' :
+        task.priority === 'high' ? 'background:#ffedd5;color:#ea580c;' :
+          task.priority === 'medium' ? 'background:#dbeafe;color:#2563eb;' :
+            'background:#dcfce7;color:#16a34a;'}">
+                ${task.priority}
+              </span>
+            </div>
+
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span style="color: #92400e; font-size: 14px; min-width: 100px;">📋 Status:</span>
+              <span style="color: #78350f; font-size: 14px;">${task.status.replace('-', ' ')}</span>
+            </div>
+          </div>
+        </div>
+
+        <div style="text-align: center; margin: 28px 0;">
+          <a href="${taskUrl}"
+             style="background-color: #d97706; color: white; padding: 14px 32px;
+                    text-decoration: none; border-radius: 6px; font-size: 15px;
+                    display: inline-block; font-weight: 600;">
+            View Task Now
+          </a>
+        </div>
+
+        <div style="background: #fef3c7; border-radius: 6px; padding: 14px; margin-bottom: 20px;">
+          <p style="color: #92400e; margin: 0; font-size: 13px;">
+            <strong>Reminder:</strong> Mark the task as complete in the dashboard once you're done.
+          </p>
+        </div>
+
+        <div style="margin-top: 24px; padding-top: 20px; border-top: 1px solid #e5e7eb;">
+          <p style="color: #9ca3af; font-size: 12px; text-align: center; margin: 0;">
+            © ${new Date().getFullYear()} AI Meeting Assistant. All rights reserved.
+          </p>
+        </div>
+      </div>
+    </div>`;
+
+    await sendEmail(user.email, ` Deadline in ~${hoursLeft}h: ${task.title}`, html);
+    console.log(`Deadline reminder sent to ${user.email} for task "${task.title}"`);
+  } catch (error) {
+    console.error('Error sending deadline reminder:', error.message);
+  }
+};
 export default sendEmail;

@@ -24,7 +24,7 @@ import SocketServer from "./socket/socketServer.js";
 // Meeting Service Import
 import MeetingStatusService from "./services/meetingStatusService.js";
 import MeetingReminderService from "./services/meetingReminderService.js";
-
+import { startTaskReminderScheduler } from './utils/taskReminderScheduler.js';
 
 // Load env vars
 dotenv.config();
@@ -102,7 +102,8 @@ console.log('✅ Meeting Status Service Started');
 // Start Meeting Reminder Service
 MeetingReminderService.start();
 console.log('✅ Meeting Reminder Service Started');
-
+// Start Task Reminder Scheduler
+startTaskReminderScheduler();
 // ✅ SINGLE SERVER LISTEN CALL
 server.listen(PORT, () => {
   console.log(`✅ Server running in ${process.env.NODE_ENV} mode on port ${PORT}`);
