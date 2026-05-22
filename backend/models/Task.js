@@ -50,11 +50,15 @@ const taskSchema = new mongoose.Schema({
   },
   dueDate: {
     type: Date,
+    // REPLACE with this (allows today, blocks past days)
     validate: {
-      validator: function(value) {
-        return !value || value > new Date();
+      validator: function (value) {
+        if (!value) return true;
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        return new Date(value) >= today;
       },
-      message: 'Due date must be in the future'
+      message: 'Due date cannot be in the past'
     }
   },
   estimatedHours: {
@@ -104,13 +108,17 @@ const taskSchema = new mongoose.Schema({
     type: Date,
     default: null
   },
+  reminderSent: {
+    type: Boolean,
+    default: false
+  },
   isRecurring: {
     type: Boolean,
     default: false
   },
   recurrencePattern: {
     type: String,
-    enum: ['daily', 'weekly', 'monthly', 'yearly',null],
+    enum: ['daily', 'weekly', 'monthly', 'yearly', null],
     default: null
   },
   nextRecurrence: {
@@ -139,13 +147,13 @@ taskSchema.index({ priority: 1, status: 1 });
 taskSchema.index({ 'assignedTo.user': 1 });
 
 // Virtual for checking if task is overdue
-taskSchema.virtual('isOverdue').get(function() {
+taskSchema.virtual('isOverdue').get(function () {
   if (!this.dueDate || this.status === 'completed') return false;
   return new Date() > this.dueDate;
 });
 
 // Virtual for days until due
-taskSchema.virtual('daysUntilDue').get(function() {
+taskSchema.virtual('daysUntilDue').get(function () {
   if (!this.dueDate) return null;
   const now = new Date();
   const due = new Date(this.dueDate);
@@ -154,29 +162,29 @@ taskSchema.virtual('daysUntilDue').get(function() {
 });
 
 // Virtual for progress percentage (for subtasks)
-taskSchema.virtual('progress').get(function() {
+taskSchema.virtual('progress').get(function () {
   if (this.subtasks.length === 0) {
     return this.status === 'completed' ? 100 : 0;
   }
-  
-  const completedSubtasks = this.subtasks.filter(subtask => 
+
+  const completedSubtasks = this.subtasks.filter(subtask =>
     subtask.status === 'completed'
   ).length;
-  
+
   return Math.round((completedSubtasks / this.subtasks.length) * 100);
 });
 
 // Virtual for assigned users count
-taskSchema.virtual('assignedUsersCount').get(function() {
+taskSchema.virtual('assignedUsersCount').get(function () {
   return this.assignedTo.length;
 });
 
 // Method to assign user to task
-taskSchema.methods.assignUser = function(userId, assignedBy) {
+taskSchema.methods.assignUser = function (userId, assignedBy) {
   const isAlreadyAssigned = this.assignedTo.some(
     assignment => assignment.user.toString() === userId.toString()
   );
-  
+
   if (!isAlreadyAssigned) {
     this.assignedTo.push({
       user: userId,
@@ -187,7 +195,7 @@ taskSchema.methods.assignUser = function(userId, assignedBy) {
 };
 
 // Method to remove user assignment
-taskSchema.methods.removeAssignment = function(userId) {
+taskSchema.methods.removeAssignment = function (userId) {
   this.assignedTo = this.assignedTo.filter(
     assignment => assignment.user.toString() !== userId.toString()
   );
@@ -195,21 +203,21 @@ taskSchema.methods.removeAssignment = function(userId) {
 };
 
 // Method to update task status
-taskSchema.methods.updateStatus = function(newStatus) {
+taskSchema.methods.updateStatus = function (newStatus) {
   this.status = newStatus;
-  
+
   if (newStatus === 'completed') {
     this.completionDate = new Date();
     this.actualHours = this.actualHours || this.estimatedHours || 0;
   } else if (newStatus !== 'completed' && this.completionDate) {
     this.completionDate = null;
   }
-  
+
   return this;
 };
 
 // Method to add comment
-taskSchema.methods.addComment = function(userId, text) {
+taskSchema.methods.addComment = function (userId, text) {
   this.comments.push({
     user: userId,
     text: text
@@ -218,7 +226,7 @@ taskSchema.methods.addComment = function(userId, text) {
 };
 
 // Static method to find overdue tasks
-taskSchema.statics.findOverdueTasks = function() {
+taskSchema.statics.findOverdueTasks = function () {
   return this.find({
     dueDate: { $lt: new Date() },
     status: { $in: ['pending', 'in-progress'] }
@@ -226,22 +234,22 @@ taskSchema.statics.findOverdueTasks = function() {
 };
 
 // Static method to find tasks by user
-taskSchema.statics.findByUser = function(userId, options = {}) {
+taskSchema.statics.findByUser = function (userId, options = {}) {
   const query = {
     $or: [
       { createdBy: userId },
       { 'assignedTo.user': userId }
     ]
   };
-  
+
   if (options.status) {
     query.status = options.status;
   }
-  
+
   if (options.priority) {
     query.priority = options.priority;
   }
-  
+
   return this.find(query)
     .populate('meeting', 'title startTime')
     .populate('createdBy', 'name email profilePicture')
@@ -250,11 +258,11 @@ taskSchema.statics.findByUser = function(userId, options = {}) {
 };
 
 // Pre-save middleware to handle recurring tasks
-taskSchema.pre('save', function(next) {
+taskSchema.pre('save', function (next) {
   if (this.isRecurring && this.status === 'completed' && this.recurrencePattern) {
     const now = new Date();
     let nextDate = new Date(this.dueDate || now);
-    
+
     switch (this.recurrencePattern) {
       case 'daily':
         nextDate.setDate(nextDate.getDate() + 1);
@@ -269,7 +277,7 @@ taskSchema.pre('save', function(next) {
         nextDate.setFullYear(nextDate.getFullYear() + 1);
         break;
     }
-    
+
     this.nextRecurrence = nextDate;
   }
   next();

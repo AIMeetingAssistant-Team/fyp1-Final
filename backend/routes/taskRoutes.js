@@ -11,6 +11,7 @@ import {
   getTaskDashboardStats
 } from "../controllers/taskController.js";
 import { protect } from "../middleware/authMiddleware.js";
+import { deleteComment } from '../controllers/taskController.js';
 
 const router = express.Router();
 
@@ -39,6 +40,7 @@ router.put("/:id", updateTask);
 
 // Delete task
 router.delete("/:id", deleteTask);
+router.delete('/:id/comments/:commentId', deleteComment);
 
 // ==================== TASK ASSIGNMENT ROUTES ====================
 
