@@ -214,11 +214,16 @@ export const createTask = async (req, res) => {
       });
     }
 
-    if (dueDate && new Date(dueDate) < new Date()) {
-      return res.status(400).json({
-        success: false,
-        message: 'Due date cannot be in the past'
-      });
+    // REPLACE with this in both places
+    if (dueDate) {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      if (new Date(dueDate) < today) {
+        return res.status(400).json({
+          success: false,
+          message: 'Due date cannot be in the past'
+        });
+      }
     }
 
     const validPriorities = ['low', 'medium', 'high', 'urgent'];
@@ -704,11 +709,16 @@ export const updateTask = async (req, res) => {
       });
     }
 
-    if (dueDate && new Date(dueDate) < new Date()) {
-      return res.status(400).json({
-        success: false,
-        message: 'Due date cannot be in the past'
-      });
+    // REPLACE with this in both places
+    if (dueDate) {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      if (new Date(dueDate) < today) {
+        return res.status(400).json({
+          success: false,
+          message: 'Due date cannot be in the past'
+        });
+      }
     }
 
     const validPriorities = ['low', 'medium', 'high', 'urgent'];
@@ -743,7 +753,10 @@ export const updateTask = async (req, res) => {
         }
       }
     });
-
+    // If dueDate changes, reset reminderSent so a new reminder can be sent
+    if (req.body.dueDate && req.body.dueDate !== task.dueDate?.toISOString()) {
+      task.reminderSent = false;
+    }
     // Handle status change
     if (status && task.status !== status) {
       task.updateStatus(status);
@@ -1129,9 +1142,10 @@ export const addComment = async (req, res) => {
       });
     }
 
-    await task.addComment(req.user.id, text.trim());
-    await task.save();
-
+    await Task.findByIdAndUpdate(
+      task._id,
+      { $push: { comments: { user: req.user.id, text: text.trim(), createdAt: new Date() } } }
+    );
     const updatedTask = await Task.findById(task._id)
       .populate('comments.user', 'name email profilePicture');
 
@@ -1149,7 +1163,36 @@ export const addComment = async (req, res) => {
     });
   }
 };
+export const deleteComment = async (req, res) => {
+  try {
+    const { commentId } = req.params;
 
+    const task = await Task.findById(req.params.id);
+    if (!task) {
+      return res.status(404).json({ success: false, message: 'Task not found' });
+    }
+
+    const comment = task.comments.id(commentId);
+    if (!comment) {
+      return res.status(404).json({ success: false, message: 'Comment not found' });
+    }
+
+    // Only comment owner can delete
+    if (comment.user.toString() !== req.user.id) {
+      return res.status(403).json({ success: false, message: 'Not authorized to delete this comment' });
+    }
+
+    task.comments.pull({ _id: commentId });
+    await Task.findByIdAndUpdate(req.params.id, {
+      $pull: { comments: { _id: commentId } }
+    });
+
+    res.status(200).json({ success: true, message: 'Comment deleted successfully' });
+  } catch (error) {
+    console.error('Delete comment error:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
 // -------------------------------------------------------------------
 // GET TASK DASHBOARD STATS (WITH FILTERS)
 // -------------------------------------------------------------------

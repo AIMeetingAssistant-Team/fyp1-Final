@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { MessageSquare, Send, User } from 'lucide-react';
 
+
 const TaskCommentSection = ({ taskId, comments, onAddComment, user }) => {
   const [newComment, setNewComment] = useState('');
   const [loading, setLoading] = useState(false);
@@ -11,44 +12,44 @@ const TaskCommentSection = ({ taskId, comments, onAddComment, user }) => {
 
     setLoading(true);
     const result = await onAddComment(taskId, newComment.trim());
-    
+
     if (result.success) {
       setNewComment('');
     } else {
       console.error('Failed to add comment:', result.message);
     }
-    
+
     setLoading(false);
   };
 
   // Helper to get user display name
   const getUserDisplayName = (commentUser) => {
     if (!commentUser) return 'Unknown User';
-    
+
     // Check different possible structures
     if (typeof commentUser === 'string') {
       return commentUser; // If it's just a string ID
     }
-    
+
     if (commentUser.name) {
       return commentUser.name;
     }
-    
+
     if (commentUser.email) {
       return commentUser.email.split('@')[0]; // Use first part of email
     }
-    
+
     return 'User';
   };
 
   // Helper to get user avatar
   const getUserAvatar = (commentUser) => {
     if (!commentUser) return null;
-    
+
     if (typeof commentUser === 'object' && commentUser.profilePicture) {
       return commentUser.profilePicture;
     }
-    
+
     return null;
   };
 
@@ -68,18 +69,24 @@ const TaskCommentSection = ({ taskId, comments, onAddComment, user }) => {
       {/* Add Comment */}
       <form onSubmit={handleSubmit} className="mb-4">
         <div className="flex items-start space-x-2">
-          <div className="flex-shrink-0">
+          <div className="flex-shrink-0 mt-1">
             {user?.profilePicture ? (
               <img
                 src={user.profilePicture}
                 alt="You"
-                className="w-8 h-8 rounded-full border-2 border-white"
+                className="w-8 h-8 rounded-full object-cover border-2 border-white"
+                onError={(e) => {
+                  e.target.style.display = 'none';
+                  e.target.nextSibling.style.display = 'flex';
+                }}
               />
-            ) : (
-              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-white text-xs font-medium">
-                {user?.name?.charAt(0)?.toUpperCase() || 'U'}
-              </div>
-            )}
+            ) : null}
+            <div
+              className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 items-center justify-center text-white text-xs font-medium border-2 border-white"
+              style={{ display: user?.profilePicture ? 'none' : 'flex' }}
+            >
+              {user?.name?.charAt(0)?.toUpperCase() || 'U'}
+            </div>
           </div>
           <div className="flex-1">
             <textarea
@@ -111,30 +118,27 @@ const TaskCommentSection = ({ taskId, comments, onAddComment, user }) => {
             const displayName = getUserDisplayName(commentUser);
             const avatarUrl = getUserAvatar(commentUser);
             const initials = getUserInitials(commentUser);
-            
+
             return (
               <div key={index} className="flex items-start space-x-2">
-                <div className="flex-shrink-0">
+                <div className="flex-shrink-0" style={{ marginTop: '16px' }}>
                   {avatarUrl ? (
                     <img
                       src={avatarUrl}
                       alt={displayName}
-                      className="w-7 h-7 rounded-full border-2 border-white"
+                      className="w-7 h-7 rounded-full object-cover border-2 border-white"
                       onError={(e) => {
-                        // Fallback to initials if image fails to load
                         e.target.style.display = 'none';
-                        e.target.parentElement.innerHTML = `
-                          <div class="w-7 h-7 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-white text-xs font-medium border-2 border-white">
-                            ${initials}
-                          </div>
-                        `;
+                        e.target.nextSibling.style.display = 'flex';
                       }}
                     />
-                  ) : (
-                    <div className="w-7 h-7 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-white text-xs font-medium border-2 border-white">
-                      {initials}
-                    </div>
-                  )}
+                  ) : null}
+                  <div
+                    className="w-7 h-7 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 items-center justify-center text-white text-xs font-medium border-2 border-white"
+                    style={{ display: avatarUrl ? 'none' : 'flex' }}
+                  >
+                    {initials}
+                  </div>
                 </div>
                 <div className="flex-1">
                   <div className="bg-gray-50 rounded-lg p-3">

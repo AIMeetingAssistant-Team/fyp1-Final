@@ -1,9 +1,10 @@
 import React, { useState, useMemo, useCallback } from 'react';
-import { 
-  CheckCircle, 
-  Clock, 
-  AlertCircle, 
-  TrendingUp, 
+import * as XLSX from 'xlsx';
+import {
+  CheckCircle,
+  Clock,
+  AlertCircle,
+  TrendingUp,
   Users,
   Calendar,
   FileText,
@@ -25,7 +26,7 @@ import {
 // Helper function for random colors - defined at module level
 const getRandomColor = () => {
   const colors = [
-    '#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', 
+    '#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6',
     '#EC4899', '#14B8A6', '#F97316', '#6366F1', '#84CC16'
   ];
   return colors[Math.floor(Math.random() * colors.length)];
@@ -50,7 +51,7 @@ const TaskStats = ({ tasks = [], currentUser, isLoading = false }) => {
         avatarColor: '#3B82F6'
       });
     }
-    
+
     safeTasks.forEach(task => {
       if (task.createdBy && task.createdBy._id && !userMap.has(task.createdBy._id)) {
         userMap.set(task.createdBy._id, {
@@ -60,7 +61,7 @@ const TaskStats = ({ tasks = [], currentUser, isLoading = false }) => {
           avatarColor: getRandomColor()
         });
       }
-      
+
       if (task.assignedTo && Array.isArray(task.assignedTo)) {
         task.assignedTo.forEach(assignment => {
           if (assignment.user && assignment.user._id && !userMap.has(assignment.user._id)) {
@@ -74,19 +75,19 @@ const TaskStats = ({ tasks = [], currentUser, isLoading = false }) => {
         });
       }
     });
-    
+
     return Array.from(userMap.values());
   }, [safeTasks, currentUser]);
 
   // Filter tasks based on selected filters
   const filteredTasks = useMemo(() => {
     let filtered = [...safeTasks];
-    
+
     if (timeRange !== 'all') {
       const now = new Date();
       let startDate = new Date();
-      
-      switch(timeRange) {
+
+      switch (timeRange) {
         case 'today':
           startDate.setHours(0, 0, 0, 0);
           break;
@@ -97,17 +98,17 @@ const TaskStats = ({ tasks = [], currentUser, isLoading = false }) => {
           startDate.setMonth(startDate.getMonth() - 1);
           break;
       }
-      
+
       filtered = filtered.filter(task => {
         if (!task.createdAt) return false;
         return new Date(task.createdAt) >= startDate;
       });
     }
-    
+
     if (selectedPriority !== 'all') {
       filtered = filtered.filter(task => task.priority === selectedPriority);
     }
-    
+
     if (selectedUser !== 'all') {
       filtered = filtered.filter(task => {
         const isCreator = task.createdBy?._id === selectedUser;
@@ -117,7 +118,7 @@ const TaskStats = ({ tasks = [], currentUser, isLoading = false }) => {
         return isCreator || isAssigned;
       });
     }
-    
+
     return filtered;
   }, [safeTasks, timeRange, selectedPriority, selectedUser]);
 
@@ -125,7 +126,7 @@ const TaskStats = ({ tasks = [], currentUser, isLoading = false }) => {
   const metrics = useMemo(() => {
     const now = new Date();
     const total = filteredTasks.length;
-    
+
     if (total === 0) {
       return {
         total: 0,
@@ -163,31 +164,31 @@ const TaskStats = ({ tasks = [], currentUser, isLoading = false }) => {
         return false;
       }
     }).length;
-    
+
     // Priority counts with safe defaults
     const urgent = filteredTasks.filter(t => (t.priority || 'medium') === 'urgent').length;
     const high = filteredTasks.filter(t => (t.priority || 'medium') === 'high').length;
     const medium = filteredTasks.filter(t => (t.priority || 'medium') === 'medium').length;
     const low = filteredTasks.filter(t => (t.priority || 'medium') === 'low').length;
-    
+
     // Calculate rates
     const completionRate = Math.round((completed / total) * 100) || 0;
     const progressRate = Math.round(((completed + inProgress) / total) * 100) || 0;
     const overdueRate = Math.round((overdue / total) * 100) || 0;
-    
+
     // Calculate performance score
     let performanceScore = 50;
     const baseScore = completionRate * 0.5;
     const timelinessScore = Math.max(0, 30 - (overdueRate * 0.3));
     const priorityScore = ((urgent * 2 + high * 1.5 + medium) / total) * 20;
     performanceScore = Math.min(100, Math.round(baseScore + timelinessScore + priorityScore));
-    
+
     // Calculate average completion time
     let avgCompletionTime = 0;
-    const completedTasks = filteredTasks.filter(t => 
+    const completedTasks = filteredTasks.filter(t =>
       t.status === 'completed' && t.createdAt
     );
-    
+
     if (completedTasks.length > 0) {
       let validTasks = 0;
       const totalDays = completedTasks.reduce((sum, task) => {
@@ -201,12 +202,12 @@ const TaskStats = ({ tasks = [], currentUser, isLoading = false }) => {
           return sum;
         }
       }, 0);
-      
+
       if (validTasks > 0) {
         avgCompletionTime = Math.round(totalDays / validTasks);
       }
     }
-    
+
     // Calculate efficiency score
     let efficiencyScore = 50;
     if (completed > 0) {
@@ -214,24 +215,24 @@ const TaskStats = ({ tasks = [], currentUser, isLoading = false }) => {
       const qualityScore = overdue > 0 ? Math.max(0, ((completed - overdue) / completed) * 100) : 100;
       efficiencyScore = Math.round((timeEfficiency * 0.4) + (qualityScore * 0.6));
     }
-    
+
     // Calculate hours with safe defaults
-    const totalEstimatedHours = filteredTasks.reduce((sum, task) => 
+    const totalEstimatedHours = filteredTasks.reduce((sum, task) =>
       sum + (parseFloat(task.estimatedHours) || 0), 0
     );
-    const totalActualHours = filteredTasks.reduce((sum, task) => 
+    const totalActualHours = filteredTasks.reduce((sum, task) =>
       sum + (parseFloat(task.actualHours) || 0), 0
     );
-    
+
     // Calculate user workload
     const userWorkloadMap = new Map();
-    
+
     filteredTasks.forEach(task => {
       // Count tasks created by user
       if (task.createdBy && task.createdBy._id) {
         const userId = task.createdBy._id;
         const userName = task.createdBy.name || 'Unknown';
-        
+
         if (!userWorkloadMap.has(userId)) {
           userWorkloadMap.set(userId, {
             id: userId,
@@ -246,7 +247,7 @@ const TaskStats = ({ tasks = [], currentUser, isLoading = false }) => {
         userWorkload.totalTasks++;
         if (task.status === 'completed') userWorkload.completed++;
         if (task.status === 'pending') userWorkload.pending++;
-        
+
         // Check if overdue
         if (task.dueDate) {
           try {
@@ -260,14 +261,14 @@ const TaskStats = ({ tasks = [], currentUser, isLoading = false }) => {
           }
         }
       }
-      
+
       // Count tasks assigned to user
       if (task.assignedTo && Array.isArray(task.assignedTo)) {
         task.assignedTo.forEach(assignment => {
           if (assignment.user && assignment.user._id) {
             const userId = assignment.user._id;
             const userName = assignment.user.name || 'Unknown';
-            
+
             if (!userWorkloadMap.has(userId)) {
               userWorkloadMap.set(userId, {
                 id: userId,
@@ -282,7 +283,7 @@ const TaskStats = ({ tasks = [], currentUser, isLoading = false }) => {
             userWorkload.totalTasks++;
             if (task.status === 'completed') userWorkload.completed++;
             if (task.status === 'pending') userWorkload.pending++;
-            
+
             // Check if overdue
             if (task.dueDate) {
               try {
@@ -299,11 +300,11 @@ const TaskStats = ({ tasks = [], currentUser, isLoading = false }) => {
         });
       }
     });
-    
+
     const userWorkload = Array.from(userWorkloadMap.values())
       .sort((a, b) => b.totalTasks - a.totalTasks)
       .slice(0, 5);
-    
+
     return {
       total,
       completed,
@@ -343,25 +344,50 @@ const TaskStats = ({ tasks = [], currentUser, isLoading = false }) => {
 
   // Handle export
   const handleExport = useCallback(() => {
-    const csvContent = [
+    const wb = XLSX.utils.book_new();
+    const dateStr = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+
+
+    const summaryRows = [
+      ['TASK ANALYTICS REPORT'],
+      [`Generated: ${dateStr}`],
+      [],
+      ['OVERVIEW', ''],
       ['Metric', 'Value'],
       ['Total Tasks', metrics.total],
       ['Completed', metrics.completed],
       ['In Progress', metrics.inProgress],
       ['Pending', metrics.pending],
       ['Overdue', metrics.overdue],
+      [],
+      ['PERFORMANCE', ''],
+      ['Metric', 'Value'],
       ['Completion Rate', `${metrics.completionRate}%`],
-      ['Performance Score', metrics.performanceScore],
-      ['Efficiency Score', metrics.efficiencyScore]
-    ].map(row => row.join(',')).join('\n');
-    
-    const blob = new Blob([csvContent], { type: 'text/csv' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `task-stats-${new Date().toISOString().split('T')[0]}.csv`;
-    a.click();
-  }, [metrics]);
+      ['Progress Rate (completed + in-progress)', `${metrics.progressRate}%`],
+      ['Overdue Rate', `${metrics.overdueRate}%`],
+      ['Performance Score', `${metrics.performanceScore} / 100`],
+      [],
+      ['PRIORITY BREAKDOWN', ''],
+      ['Priority', 'Count', '% of Total'],
+      ['Urgent', metrics.urgent, metrics.total > 0 ? `${Math.round((metrics.urgent / metrics.total) * 100)}%` : '0%'],
+      ['High', metrics.high, metrics.total > 0 ? `${Math.round((metrics.high / metrics.total) * 100)}%` : '0%'],
+      ['Medium', metrics.medium, metrics.total > 0 ? `${Math.round((metrics.medium / metrics.total) * 100)}%` : '0%'],
+      ['Low', metrics.low, metrics.total > 0 ? `${Math.round((metrics.low / metrics.total) * 100)}%` : '0%'],
+    ];
+
+    const summarySheet = XLSX.utils.aoa_to_sheet(summaryRows);
+
+    // Column widths
+    summarySheet['!cols'] = [{ wch: 42 }, { wch: 18 }, { wch: 14 }];
+
+    // Merged title cell
+    summarySheet['!merges'] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: 2 } }];
+
+    XLSX.utils.book_append_sheet(wb, summarySheet, 'Summary');
+
+    const fileName = `task-report-${new Date().toISOString().split('T')[0]}.xlsx`;
+    XLSX.writeFile(wb, fileName);
+  }, [metrics, filteredTasks]);
 
   // Loading state
   if (isLoading) {
@@ -385,7 +411,7 @@ const TaskStats = ({ tasks = [], currentUser, isLoading = false }) => {
             </div>
             <p className="text-gray-300">Real-time insights into task performance and team productivity</p>
           </div>
-          
+
           <div className="flex items-center gap-3">
             <button
               onClick={handleExport}
@@ -406,7 +432,7 @@ const TaskStats = ({ tasks = [], currentUser, isLoading = false }) => {
             <Filter className="w-5 h-5 text-gray-500" />
             <span className="text-sm font-medium text-gray-700">Filters:</span>
           </div>
-          
+
           <div className="flex flex-wrap gap-3">
             <select
               value={timeRange}
@@ -418,7 +444,7 @@ const TaskStats = ({ tasks = [], currentUser, isLoading = false }) => {
               <option value="week">Last 7 Days</option>
               <option value="month">Last 30 Days</option>
             </select>
-            
+
             <select
               value={selectedPriority}
               onChange={(e) => setSelectedPriority(e.target.value)}
@@ -430,7 +456,7 @@ const TaskStats = ({ tasks = [], currentUser, isLoading = false }) => {
               <option value="medium">Medium</option>
               <option value="low">Low</option>
             </select>
-            
+
             <select
               value={selectedUser}
               onChange={(e) => setSelectedUser(e.target.value)}
@@ -605,7 +631,7 @@ const TaskStats = ({ tasks = [], currentUser, isLoading = false }) => {
             </div>
             <span className="text-sm text-gray-500">{metrics.total} total tasks</span>
           </div>
-          
+
           <div className="flex flex-col md:flex-row items-center gap-8">
             <div className="w-48 h-48">
               {/* Simple pie chart using SVG */}
@@ -613,34 +639,34 @@ const TaskStats = ({ tasks = [], currentUser, isLoading = false }) => {
                 <svg className="w-full h-full" viewBox="0 0 100 100">
                   {statusChartData.map((item, index) => {
                     if (item.value === 0) return null;
-                    
+
                     const totalValues = statusChartData.reduce((sum, d) => sum + d.value, 0);
                     if (totalValues === 0) return null;
-                    
+
                     const percentage = (item.value / totalValues) * 100;
                     const startAngle = statusChartData
                       .slice(0, index)
                       .reduce((acc, curr) => acc + (curr.value / totalValues) * 360, 0);
                     const endAngle = startAngle + (percentage * 360 / 100);
-                    
+
                     // Calculate arc coordinates
                     const startRad = (startAngle - 90) * Math.PI / 180;
                     const endRad = (endAngle - 90) * Math.PI / 180;
-                    
+
                     const x1 = 50 + 40 * Math.cos(startRad);
                     const y1 = 50 + 40 * Math.sin(startRad);
                     const x2 = 50 + 40 * Math.cos(endRad);
                     const y2 = 50 + 40 * Math.sin(endRad);
-                    
+
                     const largeArcFlag = percentage > 50 ? 1 : 0;
-                    
+
                     const pathData = [
                       `M 50 50`,
                       `L ${x1} ${y1}`,
                       `A 40 40 0 ${largeArcFlag} 1 ${x2} ${y2}`,
                       `Z`
                     ].join(' ');
-                    
+
                     return (
                       <path
                         key={item.name}
@@ -655,13 +681,13 @@ const TaskStats = ({ tasks = [], currentUser, isLoading = false }) => {
                 </svg>
               </div>
             </div>
-            
+
             <div className="flex-1 space-y-4">
               {statusChartData.map((item) => (
                 <div key={item.name} className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <div 
-                      className="w-3 h-3 rounded-full" 
+                    <div
+                      className="w-3 h-3 rounded-full"
                       style={{ backgroundColor: item.color }}
                     ></div>
                     <span className="text-sm font-medium text-gray-700">{item.name}</span>
@@ -687,17 +713,17 @@ const TaskStats = ({ tasks = [], currentUser, isLoading = false }) => {
             </div>
             <span className="text-sm text-gray-500">By urgency level</span>
           </div>
-          
+
           <div className="space-y-4">
             {priorityChartData.map((item) => {
               const percentage = metrics.total > 0 ? (item.value / metrics.total) * 100 : 0;
-              
+
               return (
                 <div key={item.name} className="space-y-2">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                      <div 
-                        className="w-3 h-3 rounded-full" 
+                      <div
+                        className="w-3 h-3 rounded-full"
                         style={{ backgroundColor: item.color }}
                       ></div>
                       <span className="text-sm font-medium text-gray-700">{item.name}</span>
@@ -710,9 +736,9 @@ const TaskStats = ({ tasks = [], currentUser, isLoading = false }) => {
                     </div>
                   </div>
                   <div className="w-full bg-gray-100 rounded-full h-2">
-                    <div 
+                    <div
                       className="h-2 rounded-full transition-all duration-500"
-                      style={{ 
+                      style={{
                         width: `${percentage}%`,
                         backgroundColor: item.color
                       }}
@@ -725,131 +751,7 @@ const TaskStats = ({ tasks = [], currentUser, isLoading = false }) => {
         </div>
       </div>
 
-      {/* Team Workload & Performance */}
-      {metrics.userWorkload.length > 0 && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Team Workload */}
-          <div className="bg-white rounded-xl border border-gray-200 p-6">
-            <div className="flex items-center justify-between mb-6">
-              <div className="flex items-center gap-2">
-                <Users className="w-5 h-5 text-indigo-600" />
-                <h3 className="text-lg font-semibold text-gray-900">Team Workload</h3>
-              </div>
-              <span className="text-sm text-gray-500">Top 5 users</span>
-            </div>
-            
-            <div className="space-y-4">
-              {metrics.userWorkload.map((user, index) => {
-                const completionRate = user.totalTasks > 0 
-                  ? Math.round((user.completed / user.totalTasks) * 100) 
-                  : 0;
-                  
-                return (
-                  <div key={user.id || index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-bold">
-                        {user.name ? user.name.charAt(0).toUpperCase() : 'U'}
-                      </div>
-                      <div>
-                        <p className="font-medium text-gray-900">{user.name || 'Unknown User'}</p>
-                        <p className="text-sm text-gray-500">{user.totalTasks} tasks</p>
-                      </div>
-                    </div>
-                    
-                    <div className="text-right">
-                      <div className="flex items-center gap-4">
-                        <div className="text-center">
-                          <p className="text-sm text-gray-500">Completed</p>
-                          <p className="font-bold text-green-600">{user.completed}</p>
-                        </div>
-                        <div className="text-center">
-                          <p className="text-sm text-gray-500">Pending</p>
-                          <p className="font-bold text-yellow-600">{user.pending}</p>
-                        </div>
-                        <div className="w-24">
-                          <div className="mb-1">
-                            <span className="text-xs text-gray-600">{completionRate}%</span>
-                          </div>
-                          <div className="w-full bg-gray-200 rounded-full h-2">
-                            <div 
-                              className="h-2 rounded-full bg-green-500 transition-all duration-500"
-                              style={{ width: `${completionRate}%` }}
-                            ></div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
 
-          {/* Performance Metrics */}
-          <div className="bg-white rounded-xl border border-gray-200 p-6">
-            <div className="flex items-center justify-between mb-6">
-              <div className="flex items-center gap-2">
-                <Zap className="w-5 h-5 text-yellow-600" />
-                <h3 className="text-lg font-semibold text-gray-900">Performance Metrics</h3>
-              </div>
-              <span className="text-sm text-gray-500">Efficiency overview</span>
-            </div>
-            
-            <div className="grid grid-cols-2 gap-4">
-              <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl p-4">
-                <div className="flex items-center gap-2 mb-2">
-                  <TrendingUp className="w-5 h-5 text-blue-600" />
-                  <span className="text-sm font-medium text-blue-700">Efficiency Score</span>
-                </div>
-                <p className="text-3xl font-bold text-gray-900">{metrics.efficiencyScore}</p>
-                <p className="text-sm text-gray-600 mt-1">Based on time & quality</p>
-              </div>
-              
-              <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-xl p-4">
-                <div className="flex items-center gap-2 mb-2">
-                  <Clock className="w-5 h-5 text-green-600" />
-                  <span className="text-sm font-medium text-green-700">Avg. Time</span>
-                </div>
-                <p className="text-3xl font-bold text-gray-900">{metrics.avgCompletionTime}</p>
-                <p className="text-sm text-gray-600 mt-1">Days per task</p>
-              </div>
-              
-              <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl p-4">
-                <div className="flex items-center gap-2 mb-2">
-                  <UserCheck className="w-5 h-5 text-purple-600" />
-                  <span className="text-sm font-medium text-purple-700">Progress Rate</span>
-                </div>
-                <p className="text-3xl font-bold text-gray-900">{metrics.progressRate}%</p>
-                <p className="text-sm text-gray-600 mt-1">Tasks in motion</p>
-              </div>
-              
-              <div className="bg-gradient-to-br from-orange-50 to-orange-100 rounded-xl p-4">
-                <div className="flex items-center gap-2 mb-2">
-                  <Calendar className="w-5 h-5 text-orange-600" />
-                  <span className="text-sm font-medium text-orange-700">Hours Logged</span>
-                </div>
-                <p className="text-3xl font-bold text-gray-900">{Math.round(metrics.totalActualHours)}</p>
-                <p className="text-sm text-gray-600 mt-1">Actual vs {Math.round(metrics.totalEstimatedHours)} estimated</p>
-              </div>
-            </div>
-            
-            <div className="mt-6 pt-6 border-t border-gray-200">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-900">Recommendations</p>
-                  <p className="text-sm text-gray-600 mt-1">
-                    {metrics.overdue > 0 
-                      ? `Focus on ${metrics.overdue} overdue task${metrics.overdue > 1 ? 's' : ''} to improve score`
-                      : metrics.completionRate < 70
-                      ? `Increase completion rate from ${metrics.completionRate}% to 80%+`
-                      : 'Great! All tasks are on track'}
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Empty State */}
       {metrics.total === 0 && (
@@ -857,12 +759,12 @@ const TaskStats = ({ tasks = [], currentUser, isLoading = false }) => {
           <BarChart3 className="w-16 h-16 text-gray-400 mx-auto mb-4" />
           <h3 className="text-xl font-medium text-gray-900 mb-2">No Task Data Available</h3>
           <p className="text-gray-600 max-w-md mx-auto mb-6">
-            {selectedUser !== 'all' 
+            {selectedUser !== 'all'
               ? `No tasks found for the selected user in the current time range.`
               : `Create and assign tasks to start tracking performance metrics and team productivity.`}
           </p>
           <div className="flex justify-center gap-3">
-            <button 
+            <button
               onClick={() => {
                 setTimeRange('all');
                 setSelectedUser('all');
