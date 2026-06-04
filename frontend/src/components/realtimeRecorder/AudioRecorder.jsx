@@ -1,7 +1,9 @@
 import { useRef, useState, useEffect } from "react";
-import { Mic, Square, Pause, Play, FileText } from "lucide-react";
+import { Mic, Square, Pause, Play, Captions } from "lucide-react";
 import { motion } from "framer-motion";
-import { io } from "socket.io-client";
+import LiveTranscriptPanel from "../meetings/LiveTranscriptPanel";
+import MeetingCaptionsOverlay from "../meetings/MeetingCaptionsOverlay";
+import { useLiveTranscription } from "../../hooks/useLiveTranscription";
 
 export default function AudioRecorder({
   meeting,
@@ -14,75 +16,41 @@ export default function AudioRecorder({
   const recorderRef = useRef(null);
   const audioChunks = useRef([]);
   const audioStreamRef = useRef(null);
-  const socketRef = useRef(null);
-  const audioContextRef = useRef(null);
-  const audioProcessorRef = useRef(null);
-  const transcriptionActiveRef = useRef(false);
   const [isRecording, setIsRecording] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
-  const [isTranscribing, setIsTranscribing] = useState(false);
-  const [transcriptionText, setTranscriptionText] = useState("");
-  const [realTimeTranscriptionStarted, setRealTimeTranscriptionStarted] = useState(false);
+  const [captionsOpen, setCaptionsOpen] = useState(false);
   const timerRef = useRef(null);
 
-  const formatTime = (seconds) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-  };
+  const userName = (() => {
+    try {
+      const u = JSON.parse(localStorage.getItem("user") || "{}");
+      return u?.name || "You";
+    } catch {
+      return "You";
+    }
+  })();
 
-  // Initialize socket connection for real-time transcription
+  const {
+    entries,
+    latestCaption,
+    isTranscribing,
+    error: captionError,
+    activeLanguage,
+    setActiveLanguage,
+    start: startCaptions,
+    stop: stopCaptions,
+    setupAudioStreaming,
+    clear: clearCaptions,
+  } = useLiveTranscription({ meetingId, enabled: false, language: "en-ur" });
+
   useEffect(() => {
-    const token = localStorage.getItem("token");
-    if (!token || !meetingId) return;
-
-    const socket = io(import.meta.env.VITE_BASE_URL?.replace('/api', '') || 'http://localhost:5000', {
-      auth: { token },
-      transports: ['websocket', 'polling']
-    });
-
-    socketRef.current = socket;
-
-    socket.on('connect', () => {
-      console.log('✅ Socket connected for real-time transcription');
-      socket.emit('join-room', { meetingId });
-    });
-
-    socket.on('transcription:started', (data) => {
-      console.log('🎙️ Real-time transcription started');
-      setIsTranscribing(true);
-    });
-
-    socket.on('transcription:partial', (data) => {
-      if (data.meetingId === meetingId && data.text && data.text !== '[Processing audio...]' && data.text !== '[Analyzing audio...]') {
-        setTranscriptionText(prev => {
-          const newText = data.text.trim();
-          // Avoid duplicate text
-          if (prev && prev.includes(newText)) {
-            return prev;
-          }
-          return prev ? prev + ' ' + newText : newText;
-        });
-      }
-    });
-
-    socket.on('transcription:stopped', (data) => {
-      console.log('🛑 Real-time transcription stopped');
-      setIsTranscribing(false);
-    });
-
-    socket.on('error', (error) => {
-      console.error('Socket error:', error);
-      setMessage({ type: "error", text: error.message || "Transcription error occurred" });
-    });
-
-    return () => {
-      socket.disconnect();
-    };
-  }, [meetingId, setMessage]);
+    if (captionError) {
+      setMessage({ type: "error", text: captionError });
+    }
+  }, [captionError, setMessage]);
 
   useEffect(() => {
     if (isRecording && !isPaused) {
@@ -95,6 +63,29 @@ export default function AudioRecorder({
 
     return () => clearInterval(timerRef.current);
   }, [isRecording, isPaused]);
+
+  const toggleCaptions = async () => {
+    if (captionsOpen) {
+      stopCaptions();
+      setCaptionsOpen(false);
+      return;
+    }
+    if (!isRecording) {
+      setMessage({ type: "error", text: "Start recording before enabling live captions." });
+      return;
+    }
+    const stream = audioStreamRef.current;
+    if (!stream) {
+      setMessage({ type: "error", text: "Microphone not available." });
+      return;
+    }
+    clearCaptions();
+    const ok = await startCaptions(stream);
+    if (ok) {
+      setCaptionsOpen(true);
+      await setupAudioStreaming(stream);
+    }
+  };
 
   const startRecording = async () => {
     try {
@@ -110,115 +101,10 @@ export default function AudioRecorder({
       setIsRecording(true);
       setRecordingTime(0);
       setIsPaused(false);
-      setTranscriptionText("");
-      setRealTimeTranscriptionStarted(false);
-    } catch (error) {
+      clearCaptions();
+      setCaptionsOpen(false);
+    } catch {
       setMessage({ type: "error", text: "Microphone access denied" });
-    }
-  };
-
-  const startRealTimeTranscription = async () => {
-    if (!socketRef.current || !socketRef.current.connected) {
-      setMessage({ type: "error", text: "Connection not established. Please try again." });
-      return;
-    }
-
-    try {
-      // Start transcription on server
-      socketRef.current.emit('transcription:start', { meetingId });
-      setRealTimeTranscriptionStarted(true);
-      transcriptionActiveRef.current = true;
-      
-      // Setup audio streaming for real-time transcription
-      if (!audioStreamRef.current) {
-        audioStreamRef.current = await navigator.mediaDevices.getUserMedia({ audio: true });
-      }
-      
-      if (audioStreamRef.current) {
-        await setupAudioStreaming(audioStreamRef.current);
-      }
-    } catch (error) {
-      console.error('Failed to start real-time transcription:', error);
-      setMessage({ type: "error", text: "Failed to start real-time transcription" });
-    }
-  };
-
-  const setupAudioStreaming = async (stream) => {
-    try {
-      const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-      audioContextRef.current = audioContext;
-      
-      const sampleRate = audioContext.sampleRate;
-      console.log(`🎵 Audio context sample rate: ${sampleRate}Hz`);
-      
-      // Send sample rate info to server
-      if (socketRef.current?.connected) {
-        socketRef.current.emit('transcription:audio-config', {
-          meetingId,
-          sampleRate: sampleRate,
-          channels: 1
-        });
-      }
-      
-      const source = audioContext.createMediaStreamSource(stream);
-      const processor = audioContext.createScriptProcessor(4096, 1, 1);
-      
-      let chunkCount = 0;
-      processor.onaudioprocess = (e) => {
-        if (transcriptionActiveRef.current && socketRef.current?.connected) {
-          const inputData = e.inputBuffer.getChannelData(0);
-          // Convert Float32Array to Int16Array for transmission
-          const int16Data = new Int16Array(inputData.length);
-          for (let i = 0; i < inputData.length; i++) {
-            int16Data[i] = Math.max(-32768, Math.min(32767, inputData[i] * 32768));
-          }
-          
-          chunkCount++;
-          // Send audio chunk to server
-          socketRef.current.emit('transcription:audio-chunk', {
-            meetingId,
-            audioData: Array.from(int16Data),
-            sampleRate: sampleRate,
-            isFinal: false
-          });
-        }
-      };
-      
-      source.connect(processor);
-      // Create a dummy destination to complete the audio graph without causing feedback
-      const gainNode = audioContext.createGain();
-      gainNode.gain.value = 0; // Mute to prevent feedback
-      processor.connect(gainNode);
-      gainNode.connect(audioContext.destination);
-      audioProcessorRef.current = { processor, activeRef: transcriptionActiveRef };
-      
-      console.log('✅ Audio streaming setup complete');
-    } catch (error) {
-      console.error('Failed to setup audio streaming:', error);
-    }
-  };
-
-  const stopRealTimeTranscription = () => {
-    if (socketRef.current && socketRef.current.connected) {
-      socketRef.current.emit('transcription:stop', { meetingId });
-      setRealTimeTranscriptionStarted(false);
-      transcriptionActiveRef.current = false;
-    }
-    
-    // Cleanup audio processing
-    if (audioProcessorRef.current) {
-      if (audioProcessorRef.current.processor) {
-        audioProcessorRef.current.processor.disconnect();
-        if (audioProcessorRef.current.activeRef) {
-          audioProcessorRef.current.activeRef.current = false;
-        }
-      }
-      audioProcessorRef.current = null;
-    }
-    
-    if (audioContextRef.current) {
-      audioContextRef.current.close();
-      audioContextRef.current = null;
     }
   };
 
@@ -238,39 +124,21 @@ export default function AudioRecorder({
 
   const stopRecording = () => {
     if (recorderRef.current && isRecording) {
-      // Stop real-time transcription if it was started
-      if (realTimeTranscriptionStarted) {
-        stopRealTimeTranscription();
+      if (captionsOpen) {
+        stopCaptions();
+        setCaptionsOpen(false);
       }
-      
+
       recorderRef.current.stop();
       setIsRecording(false);
       setIsPaused(false);
       clearInterval(timerRef.current);
-      
-      // Stop all tracks
+
       recorderRef.current.stream?.getTracks().forEach(track => track.stop());
       if (audioStreamRef.current) {
         audioStreamRef.current.getTracks().forEach(track => track.stop());
       }
-      
-      // Cleanup audio processing
-      if (audioProcessorRef.current) {
-        if (audioProcessorRef.current.processor) {
-          audioProcessorRef.current.processor.disconnect();
-          if (audioProcessorRef.current.activeRef) {
-            audioProcessorRef.current.activeRef.current = false;
-          }
-        }
-        audioProcessorRef.current = null;
-      }
-      
-      if (audioContextRef.current) {
-        audioContextRef.current.close();
-        audioContextRef.current = null;
-      }
-      
-      // Show uploading state
+
       setIsUploading(true);
     }
   };
@@ -282,58 +150,52 @@ export default function AudioRecorder({
     formData.append("meetingId", meetingId);
 
     try {
-      // Create a progress event handler
       const xhr = new XMLHttpRequest();
-      
+
       xhr.upload.onprogress = (e) => {
         if (e.lengthComputable) {
           const percentComplete = (e.loaded / e.total) * 100;
           setUploadProgress(Math.round(percentComplete));
         }
       };
-      
+
       xhr.onload = async () => {
         if (xhr.status === 200) {
           const data = JSON.parse(xhr.responseText);
-          
+
           if (data.success) {
             setRecordings(prev => [...prev, data.recording]);
             setMessage({ type: "success", text: "Recording saved successfully!" });
-            
-            // Scenario 2: If real-time transcription was NOT started, trigger transcription after save
-            if (!realTimeTranscriptionStarted) {
-              try {
-                const token = localStorage.getItem("token");
-                const transcriptionResponse = await fetch(
-                  `${import.meta.env.VITE_BASE_URL}/ai/meetings/${meetingId}/transcribe/0`,
-                  {
-                    method: "POST",
-                    headers: {
-                      "Authorization": `Bearer ${token}`,
-                      "Content-Type": "application/json"
-                    },
-                    body: JSON.stringify({
-                      language: "en",
-                      generateMinutes: true,
-                      extractTasks: false
-                    })
-                  }
-                );
-                
-                if (transcriptionResponse.ok) {
-                  console.log("✅ Transcription started after recording save");
-                } else {
-                  console.error("Transcription request failed:", transcriptionResponse.status);
+
+            // Always run full AI pipeline on the saved recording (independent of live captions)
+            try {
+              const token = localStorage.getItem("token");
+              const transcriptionResponse = await fetch(
+                `${import.meta.env.VITE_BASE_URL}/ai/meetings/${meetingId}/transcribe/0`,
+                {
+                  method: "POST",
+                  headers: {
+                    "Authorization": `Bearer ${token}`,
+                    "Content-Type": "application/json"
+                  },
+                  body: JSON.stringify({
+                    language: "en-ur",
+                    generateMinutes: true,
+                    extractTasks: false
+                  })
                 }
-              } catch (error) {
-                console.error("Failed to start transcription after save:", error);
+              );
+
+              if (transcriptionResponse.ok) {
+                console.log("✅ Full AI pipeline started after recording save");
+              } else {
+                console.error("Transcription request failed:", transcriptionResponse.status);
               }
+            } catch (error) {
+              console.error("Failed to start transcription after save:", error);
             }
-            
-            // Wait a moment to show the success message
+
             await new Promise(resolve => setTimeout(resolve, 1500));
-            
-            // Trigger the finish callback which will navigate away
             onFinish();
           } else {
             setMessage({ type: "error", text: "Failed to save recording" });
@@ -344,23 +206,22 @@ export default function AudioRecorder({
           setIsUploading(false);
         }
       };
-      
+
       xhr.onerror = () => {
         setMessage({ type: "error", text: "Network error. Please check your connection." });
         setIsUploading(false);
       };
-      
+
       xhr.open("POST", `${import.meta.env.VITE_BASE_URL}/recordings/${meetingId}/upload`);
       xhr.setRequestHeader("Authorization", `Bearer ${localStorage.getItem("token")}`);
       xhr.send(formData);
-      
-    } catch (error) {
+
+    } catch {
       setMessage({ type: "error", text: "Upload failed. Please try again." });
       setIsUploading(false);
     }
   };
 
-  // If we're uploading, show the upload progress
   if (isUploading) {
     return (
       <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 sm:p-6 lg:p-8">
@@ -377,38 +238,37 @@ export default function AudioRecorder({
               </svg>
             )}
           </div>
-          
+
           <h3 className="text-xl font-semibold text-gray-900 mb-2">
             {uploadProgress < 100 ? 'Uploading Recording' : 'Recording Saved!'}
           </h3>
-          
+
           <p className="text-gray-600 mb-6">
-            {uploadProgress < 100 
-              ? 'Please wait while your recording is being uploaded...' 
+            {uploadProgress < 100
+              ? 'Please wait while your recording is being uploaded...'
               : 'Your recording has been successfully saved!'}
           </p>
-          
-          {/* Progress Bar */}
+
           <div className="max-w-md mx-auto mb-6">
             <div className="flex justify-between text-sm text-gray-500 mb-2">
               <span>Upload Progress</span>
               <span>{uploadProgress}%</span>
             </div>
             <div className="w-full bg-gray-200 rounded-full h-2">
-              <div 
+              <div
                 className="bg-gradient-to-r from-cyan-500 to-cyan-600 h-2 rounded-full transition-all duration-300"
                 style={{ width: `${uploadProgress}%` }}
-              ></div>
+              />
             </div>
           </div>
-          
+
           {uploadProgress < 100 ? (
             <p className="text-sm text-gray-400">
               This may take a few moments depending on the recording length
             </p>
           ) : (
             <p className="text-sm text-gray-400">
-              Redirecting to meeting details...
+              Redirecting to meeting details…
             </p>
           )}
         </div>
@@ -423,25 +283,34 @@ export default function AudioRecorder({
         <p className="text-gray-400 text-sm sm:text-base">Record audio for this meeting session</p>
       </div>
 
-      {/* Timer Display */}
-      <div className="flex justify-center mb-6 sm:mb-8">
-        <div className="bg-gray-50 rounded-xl p-4 sm:p-6 border border-gray-200 w-full max-w-xs">
-          <div className="text-center">
-            <p className="text-sm text-gray-400 mb-2">Recording Time</p>
-            <div className="text-3xl sm:text-4xl font-bold text-gray-900 font-mono">
-              {formatTime(recordingTime)}
-            </div>
-            <div className="flex items-center justify-center gap-1 mt-2">
-              <div className={`w-2 h-2 rounded-full ${isRecording ? 'bg-red-500 animate-pulse' : 'bg-gray-300'}`} />
-              <p className="text-xs text-gray-400">
-                {isRecording ? (isPaused ? 'Paused' : 'Recording...') : 'Ready to record'}
-              </p>
+      <div className="relative recorder-captions-wrap min-h-[120px]">
+        <div className="flex justify-center mb-6 sm:mb-8">
+          <div className="bg-gray-50 rounded-xl p-4 sm:p-6 border border-gray-200 w-full max-w-xs">
+            <div className="text-center">
+              <p className="text-sm text-gray-400 mb-2">Recording Time</p>
+              <div className="text-3xl sm:text-4xl font-bold text-gray-900 font-mono">
+                {formatTime(recordingTime)}
+              </div>
+              <div className="flex items-center justify-center gap-1 mt-2">
+                <div className={`w-2 h-2 rounded-full ${isRecording ? 'bg-red-500 animate-pulse' : 'bg-gray-300'}`} />
+                <p className="text-xs text-gray-400">
+                  {isRecording ? (isPaused ? 'Paused' : 'Recording...') : 'Ready to record'}
+                </p>
+              </div>
             </div>
           </div>
         </div>
+
+        {captionsOpen && (
+          <MeetingCaptionsOverlay
+            visible
+            text={latestCaption}
+            speaker={userName}
+            isListening={isTranscribing}
+          />
+        )}
       </div>
 
-      {/* Recording Controls */}
       <div className="flex flex-col items-center gap-4 sm:gap-6">
         <div className="flex items-center justify-center gap-4 sm:gap-6">
           {!isRecording ? (
@@ -474,17 +343,17 @@ export default function AudioRecorder({
                   <Pause className="w-6 h-6 sm:w-8 sm:h-8 text-white" />
                 </motion.button>
               )}
-              {!realTimeTranscriptionStarted && (
-                <motion.button
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  onClick={startRealTimeTranscription}
-                  className="p-4 sm:p-5 bg-purple-500 hover:bg-purple-600 rounded-full shadow-sm transition-all duration-200"
-                  title="Start real-time transcription"
-                >
-                  <FileText className="w-6 h-6 sm:w-8 sm:h-8 text-white" />
-                </motion.button>
-              )}
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={toggleCaptions}
+                className={`p-4 sm:p-5 rounded-full shadow-sm transition-all duration-200 ${
+                  captionsOpen ? 'bg-blue-600 hover:bg-blue-700' : 'bg-purple-500 hover:bg-purple-600'
+                }`}
+                title={captionsOpen ? 'Turn off live captions' : 'Turn on live captions'}
+              >
+                <Captions className="w-6 h-6 sm:w-8 sm:h-8 text-white" />
+              </motion.button>
               <motion.button
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
@@ -499,36 +368,30 @@ export default function AudioRecorder({
 
         <div className="text-center">
           <p className="text-sm text-gray-400 mb-1">
-            {isRecording 
+            {isRecording
               ? (isPaused ? 'Recording paused. Click resume to continue.' : 'Click stop to save recording')
-              : 'Click microphone to start recording'
-            }
+              : 'Click microphone to start recording'}
           </p>
           <p className="text-xs text-gray-400">
-            {realTimeTranscriptionStarted 
-              ? 'Real-time transcription is active' 
-              : 'Click transcribe button for live transcription, or it will start after saving'
-            }
+            {captionsOpen
+              ? 'Live captions on — full AI transcript still runs after you save'
+              : 'Use the captions button during recording for Google Meet–style live text'}
           </p>
         </div>
       </div>
 
-      {/* Real-time Transcription Display */}
-      {realTimeTranscriptionStarted && (
-        <div className="mt-6 p-4 bg-gray-50 rounded-lg border border-gray-200 max-h-48 overflow-y-auto">
-          <div className="flex items-center gap-2 mb-2">
-            <div className="w-2 h-2 rounded-full bg-purple-500 animate-pulse" />
-            <p className="text-sm font-medium text-gray-700">Live Transcription</p>
-          </div>
-          {transcriptionText ? (
-            <p className="text-sm text-gray-600 whitespace-pre-wrap">{transcriptionText}</p>
-          ) : (
-            <p className="text-sm text-gray-400 italic">Listening and processing audio... Transcription will appear here shortly.</p>
-          )}
+      {captionsOpen && (
+        <div className="mt-6 max-h-64 overflow-hidden rounded-lg border border-slate-200 bg-slate-950">
+          <LiveTranscriptPanel
+            entries={entries}
+            activeLanguage={activeLanguage}
+            isTranscribing={isTranscribing}
+            onLanguageChange={setActiveLanguage}
+            className="max-h-64"
+          />
         </div>
       )}
 
-      {/* Status Bar */}
       <div className="mt-8 pt-6 border-t border-gray-200">
         <div className="flex items-center justify-between text-sm">
           <div className="flex items-center">
@@ -537,14 +400,20 @@ export default function AudioRecorder({
               {isRecording ? (isPaused ? 'Paused' : 'Recording Active') : 'Ready'}
             </span>
           </div>
-          {realTimeTranscriptionStarted && (
+          {captionsOpen && (
             <div className="flex items-center gap-2">
               <div className="w-2 h-2 rounded-full bg-purple-500 animate-pulse" />
-              <span className="text-purple-600 font-medium">Transcribing...</span>
+              <span className="text-purple-600 font-medium">Live captions</span>
             </div>
           )}
         </div>
       </div>
     </div>
   );
+
+  function formatTime(seconds) {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  }
 }

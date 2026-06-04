@@ -65,33 +65,25 @@ const meetingSchema = new mongoose.Schema({
     validate: {
       validator: function (value) {
         const now = new Date();
+        const meetingType = this?.meetingType;
+        const status = this?.status;
 
-        // For instant meetings (live type with in-progress status), allow any time
-        if (this.meetingType === 'live' && this.status === 'in-progress') {
-          // Allow instant meetings to start immediately (within last 5 minutes)
+        if (meetingType === 'live' && status === 'in-progress') {
           const fiveMinutesAgo = new Date(now.getTime() - 5 * 60 * 1000);
           return value >= fiveMinutesAgo;
         }
 
-        // For upload and recording meetings, skip validation
-        if (this.meetingType === 'upload' || this.meetingType === "recording") {
+        if (meetingType === 'upload' || meetingType === 'recording') {
           return true;
         }
 
-        // For scheduled live meetings, require future dates
-        if (this.meetingType === 'live' && this.status === 'scheduled') {
+        if (meetingType === 'live' && status === 'scheduled') {
           return value > now;
         }
 
-        // Default: allow any time
         return true;
       },
-      message: function (props) {
-        if (this.meetingType === 'live' && this.status === 'scheduled') {
-          return 'Start time must be in the future for scheduled meetings';
-        }
-        return 'Invalid start time';
-      }
+      message: 'Start time is invalid for this meeting type and status',
     }
   },
   endTime: {
@@ -99,11 +91,10 @@ const meetingSchema = new mongoose.Schema({
     required: [true, 'End time is required'],
     validate: {
       validator: function (value) {
-        // For upload meetings, be more lenient
-        if (this.meetingType === 'upload') {
-          return value >= this.startTime; // Allow equal or later
+        if (this?.meetingType === 'upload') {
+          return value >= this.startTime;
         }
-        if (this.meetingType === "recording") {
+        if (this?.meetingType === 'recording') {
           return true;
         }
         return value > this.startTime;
@@ -335,7 +326,28 @@ const meetingSchema = new mongoose.Schema({
       default: false
     },
     viewedAt: Date
-  }]
+  }],
+
+  meetingCode: {
+    type: String,
+    unique: true,
+    sparse: true
+  },
+  videoRoomId: {
+    type: String,
+    default: null
+  },
+  videoStartedAt: Date,
+  videoEndedAt: Date,
+  actualDuration: Number,
+
+  liveKit: {
+    roomName: String,
+    lastJoinedAt: Date,
+    recordingActive: { type: Boolean, default: false },
+    recordingStartedAt: Date,
+    recordingEndedAt: Date,    
+  },
 }, {
   timestamps: true
 });
