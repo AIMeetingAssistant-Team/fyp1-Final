@@ -8,7 +8,7 @@ class AIService {
     
     this.client = axios.create({
       baseURL: this.baseURL,
-      timeout: this.timeout,
+      timeout: this.baseTimeout,
       headers: {
         'Content-Type': 'application/json',
       }
@@ -80,20 +80,10 @@ class AIService {
       const blob = new Blob([fileBuffer], { type: this.getMimeType(filename) });
       formData.append('file', blob, filename);
       
-      // Add metadata
+      // Send language hint to AI service (en-ur = English+Urdu bilingual mode)
       if (language) {
-        formData.append('language', language);
+        formData.append('language', String(language));
       }
-      formData.append('task', 'transcribe');
-      formData.append('model', 'whisper-large-v3');
-      formData.append('temperature', '0');
-      formData.append('best_of', '5');
-      formData.append('beam_size', '5');
-      formData.append('patience', '1.0');
-      formData.append('condition_on_previous_text', 'true');
-      formData.append('compression_ratio_threshold', '2.4');
-      formData.append('logprob_threshold', '-1.0');
-      formData.append('no_speech_threshold', '0.6');
       
       const response = await axios.post(
         `${this.baseURL}/api/v1/transcription/transcribe-file`,
@@ -150,6 +140,46 @@ class AIService {
         error: error.message,
         status: error.response?.status || 500,
         response: error.response?.data
+      };
+    }
+  }
+
+  /**
+   * Real-time chunk transcription (lower latency, optimized for streaming)
+   */
+  async transcribeStreamChunk(fileBuffer, filename, language = 'auto') {
+    try {
+      const formData = new FormData();
+      const blob = new Blob([fileBuffer], { type: this.getMimeType(filename) });
+      formData.append('file', blob, filename);
+      if (language && language !== 'auto') {
+        formData.append('language', language);
+      }
+      formData.append('detect_language', language === 'auto' ? 'true' : 'false');
+
+      const response = await axios.post(
+        `${this.baseURL}/api/v1/transcription/transcribe-chunk`,
+        formData,
+        {
+          headers: { 'Content-Type': 'multipart/form-data' },
+          timeout: 120000,
+        }
+      );
+
+      return {
+        success: true,
+        text: response.data.text || '',
+        segments: response.data.segments || [],
+        language: response.data.language || 'en',
+        confidence: response.data.confidence || 0.85,
+        isPartial: response.data.is_partial ?? true,
+      };
+    } catch (error) {
+      console.error('Stream chunk transcription failed:', error.message);
+      return {
+        success: false,
+        error: error.message,
+        text: '',
       };
     }
   }

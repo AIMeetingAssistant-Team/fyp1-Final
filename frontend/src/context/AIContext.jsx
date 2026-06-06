@@ -354,10 +354,9 @@ export const AIProvider = ({ children }) => {
     }));
 
     try {
-      // Ensure language defaults to English
       const requestOptions = {
         ...options,
-        language: options.language || 'en'
+        language: options.language || 'en-ur',
       };
       
       const response = await aiRequest(

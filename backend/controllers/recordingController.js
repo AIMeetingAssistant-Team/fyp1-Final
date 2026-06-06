@@ -1,7 +1,19 @@
+import path from 'path';
 import Meeting from '../models/Meeting.js';
 import { recordingUpload } from '../config/cloudinary.js';
 import User from '../models/User.js';
 import { triggerTranscriptionForRecording } from './aiController.js';
+import { getTranscriptionLanguage } from '../utils/transcriptionConfig.js';
+
+/** Multer on Windows often reports webm uploads as text/plain — infer from filename. */
+function resolveRecordingFileType(file) {
+  const mime = file.mimetype || '';
+  if (mime.startsWith('video/')) return 'video';
+  if (mime.startsWith('audio/')) return 'audio';
+  const ext = path.extname(file.originalname || '').toLowerCase();
+  if (['.webm', '.mp4', '.mov', '.avi', '.mkv', '.mpeg', '.m4v'].includes(ext)) return 'video';
+  return 'audio';
+}
 
 // Middleware for authorization check before file upload
 export const checkUploadAuthorization = async (req, res, next) => {
@@ -72,7 +84,7 @@ export const uploadMultipleRecordingsHandler = async (req, res) => {
         url: file.path,
         publicId: file.filename,
         fileName: file.originalname,
-        fileType: file.mimetype.startsWith('video') ? 'video' : 'audio',
+        fileType: resolveRecordingFileType(file),
         fileSize: file.size,
         uploadedAt: new Date(),
         uploadedBy: userId,
@@ -119,7 +131,7 @@ export const uploadMultipleRecordingsHandler = async (req, res) => {
             // Stagger each transcription start by 2 seconds
             setTimeout(() => {
               triggerTranscriptionForRecording(meetingDoc._id, recordingIndex, {
-                language: 'en',
+                language: getTranscriptionLanguage(),
                 generateMinutes: true,
                 extractTasks: false,
                 userId: userId
@@ -221,11 +233,13 @@ export const uploadRecording = async (req, res) => {
           type: req.file.mimetype
         });
 
+        const fileType = resolveRecordingFileType(req.file);
+
         const recordingData = {
           url: req.file.path,
           publicId: req.file.filename,
           fileName: req.file.originalname,
-          fileType: req.file.mimetype.startsWith('video') ? 'video' : 'audio',
+          fileType,
           fileSize: req.file.size,
           uploadedAt: new Date(),
           uploadedBy: userId,
@@ -246,7 +260,7 @@ export const uploadRecording = async (req, res) => {
         meeting.status = 'completed';
         await meeting.save();
 
-        console.log(`Successfully uploaded file to meeting ${meetingId}`);
+        console.log(`Successfully uploaded file to meeting ${meetingId} (${fileType}, ${req.file.mimetype})`);
 
         // Auto-transcribe only if autoProcessAI is enabled
         // Fetch fresh meeting to get autoProcessAI setting
@@ -257,7 +271,7 @@ export const uploadRecording = async (req, res) => {
           const recordingIndex = meeting.recordings.length - 1;
           setTimeout(() => {
             triggerTranscriptionForRecording(meetingId, recordingIndex, {
-              language: 'en',
+                language: getTranscriptionLanguage(),
               generateMinutes: true,
               extractTasks: false,
               userId: userId

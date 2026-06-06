@@ -1,4 +1,5 @@
 import aiService from '../utils/aiService.js';
+import { getTranscriptionLanguage } from '../utils/transcriptionConfig.js';
 import Meeting from '../models/Meeting.js';
 import Task from '../models/Task.js';
 import axios from 'axios';
@@ -147,7 +148,7 @@ export async function triggerTranscriptionForRecording(meetingId, recordingIndex
 
   try {
     const {
-      language = 'en',
+      language = getTranscriptionLanguage(options.language),
       generateMinutes = true,
       extractTasks = false,
       userId = null
@@ -218,7 +219,7 @@ async function processTranscriptionAsync(meeting, recording, recordingIndex, lan
     const transcriptionResult = await aiService.transcribeAudio(
       recordingBuffer,
       recording.fileName,
-      language || 'en'
+      language || getTranscriptionLanguage()
     );
 
     if (!transcriptionResult.success) {

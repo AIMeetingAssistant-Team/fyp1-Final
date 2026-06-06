@@ -37,6 +37,36 @@ function PublicRoute({ element }) {
   return user ? <Navigate to="/workspace" /> : element;
 }
 
+function AppLayout() {
+  return (
+    <Layout>
+      <Routes>
+        <Route path="/" element={<Home />} />
+        <Route path="/signup" element={<PublicRoute element={<AuthForm mode="signup" />} />} />
+        <Route path="/signin" element={<PublicRoute element={<AuthForm mode="signin" />} />} />
+        <Route path="/verify-email" element={<PublicRoute element={<VerifyEmail />} />} />
+        <Route path="/forgot-password" element={<PublicRoute element={<ForgotPassword />} />} />
+        <Route path="/reset-password/:token" element={<PublicRoute element={<ResetPassword />} />} />
+        <Route path="/profile" element={<PrivateRoute element={<ProfilePage />} />} />
+        <Route path="/workspace" element={<PrivateRoute element={<MainWorkspace />} />} />
+        <Route path="/dashboard" element={<PrivateRoute element={<Dashboard />} />} />
+        <Route path="/join" element={<PrivateRoute element={<JoinMeeting />} />} />
+        <Route path="/schedule" element={<PrivateRoute element={<ScheduleMeeting />} />} />
+        <Route path="/meetings" element={<PrivateRoute element={<Meetings />} />} />
+        <Route path="/meetings/:id" element={<PrivateRoute element={<MeetingDetails />} />} />
+        <Route path="/meetings/:id/ai" element={<PrivateRoute element={<MeetingAIPanel />} />} />
+        <Route path="/calendar" element={<PrivateRoute element={<Calendar />} />} />
+        <Route path="/realtime-recording" element={<PrivateRoute element={<RealtimeRecorder />} />} />
+        <Route path="/realtime-recorder/:meetingId" element={<PrivateRoute element={<RealtimeRecorder />} />} />
+        <Route path="/upload-recordings" element={<PrivateRoute element={<UploadRecordings />} />} />
+        <Route path="/documents" element={<PrivateRoute element={<DocumentList />} />} />
+        <Route path="/tasks" element={<PrivateRoute element={<Tasks />} />} />
+        <Route path="*" element={<Navigate to="/" />} />
+      </Routes>
+    </Layout>
+  );
+}
+
 export default function App() {
   return (
     <Router>

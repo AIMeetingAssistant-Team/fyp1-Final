@@ -91,7 +91,7 @@ export default function JoinByCode() {
       
       // Get ZEGO token
       const tokenRes = await apiRequest(
-        `/zego/meetings/${meetingInfo._id}/token`, 
+        `/livekit/meetings/${meetingInfo._id}/token`, 
         'POST', 
         { role: 'participant' }, 
         token
@@ -104,7 +104,7 @@ export default function JoinByCode() {
       const roomId = meetingInfo._id.toString();
       
       // Navigate to video room
-      navigate(`/video-room/${roomId}`, { 
+      navigate(`/video-meeting/${roomId}`, { 
         state: { 
           tokenData: tokenRes.tokenData,
           meetingInfo: meetingInfo,

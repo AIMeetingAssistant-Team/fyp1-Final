@@ -199,7 +199,17 @@ const Tasks = () => {
       return { success: false, message: error.message };
     }
   };
-
+  const handleDeleteComment = async (taskId, commentId) => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await apiRequest(`/tasks/${taskId}/comments/${commentId}`, 'DELETE', null, token);
+      if (response.success) {
+        fetchTasks();
+      }
+    } catch (error) {
+      console.error('Delete comment error:', error);
+    }
+  };
   const handleFilterChange = (newFilters) => {
     setFilters(prev => ({ ...prev, ...newFilters }));
   };

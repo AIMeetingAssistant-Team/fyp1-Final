@@ -6,6 +6,7 @@ import ChatHandlers from './chatHandlers.js';
 import TaskHandlers from './taskHandlers.js';
 import NotificationHandlers from './notificationHandlers.js';
 import VideoHandlers from './videoHandlers.js';
+import TranscriptionHandlers from './transcriptionHandler.js';
 
 // Store active users and their socket connections
 const activeUsers = new Map(); // userId -> socketId
@@ -15,7 +16,7 @@ class SocketServer {
   constructor(server) {
     this.io = new Server(server, {
       cors: {
-        origin: process.env.CLIENT_URL || "http://localhost:3000",
+        origin: process.env.CLIENT_URL || "http://localhost:5173",
         methods: ["GET", "POST"],
         credentials: true
       }
@@ -75,7 +76,8 @@ class SocketServer {
       new ChatHandlers(socket, this.io);
       new TaskHandlers(socket, this.io);
       new NotificationHandlers(socket, this.io);
-      new VideoHandlers(socket, this.io); // ADD THIS LINE
+      new VideoHandlers(socket, this.io);
+      new TranscriptionHandlers(socket, this.io);
 
 
       // Handle disconnect

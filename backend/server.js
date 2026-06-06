@@ -16,6 +16,7 @@ import documentRoutes from "./routes/documentRoutes.js";
 import inviteRoutes from "./routes/inviteRoutes.js";
 import taskRoutes from "./routes/taskRoutes.js";
 import zegoRoutes from './routes/zegoRoutes.js';
+import livekitRoutes from './routes/livekitRoutes.js';
 import recordingRoutes from './routes/recordingRoutes.js';
 import aiRoutes from './routes/aiRoutes.js';
 import analyticsRoutes from './routes/analyticsRoutes.js';
@@ -24,7 +25,7 @@ import SocketServer from "./socket/socketServer.js";
 // Meeting Service Import
 import MeetingStatusService from "./services/meetingStatusService.js";
 import MeetingReminderService from "./services/meetingReminderService.js";
-
+import { startTaskReminderScheduler } from './utils/taskReminderScheduler.js';
 
 // Load env vars
 dotenv.config();
@@ -63,6 +64,7 @@ app.use("/api/documents", documentRoutes);
 app.use("/api/invites", inviteRoutes);
 app.use("/api/tasks", taskRoutes);
 app.use("/api/zego", zegoRoutes);
+app.use("/api/livekit", livekitRoutes);
 app.use('/api/recordings', recordingRoutes);
 app.use("/api/ai", aiRoutes);
 app.use('/api/analytics', analyticsRoutes);
@@ -103,7 +105,8 @@ console.log('✅ Meeting Status Service Started');
 // Start Meeting Reminder Service
 MeetingReminderService.start();
 console.log('✅ Meeting Reminder Service Started');
-
+// Start Task Reminder Scheduler
+startTaskReminderScheduler();
 // ✅ SINGLE SERVER LISTEN CALL
 server.listen(PORT, () => {
   console.log(`✅ Server running in ${process.env.NODE_ENV} mode on port ${PORT}`);

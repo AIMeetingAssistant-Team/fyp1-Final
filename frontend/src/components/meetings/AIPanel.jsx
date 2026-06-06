@@ -92,7 +92,7 @@ const AIPanel = ({ meetingId, meetingData }) => {
     await transcribeRecording(meetingId, selectedRecordingIndex, {
       generateMinutes: true,
       extractTasks: true,
-      language: 'en'
+      language: 'en-ur',
     });
   };
 

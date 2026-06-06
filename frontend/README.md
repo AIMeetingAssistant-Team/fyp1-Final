@@ -1,16 +1,63 @@
-# React + Vite
+# Frontend — AI Meeting Assistant
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+React + Vite single-page application for the FYP meeting management platform.
 
-Currently, two official plugins are available:
+## Overview
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+The UI covers authentication, meeting scheduling, three recording/meeting workflows (upload, realtime audio, LiveKit video), tasks, documents, calendar, and the meeting AI panel.
 
-## React Compiler
+**Full project setup** (backend, AI service, MongoDB, LiveKit): see the [root README](../README.md).
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## Scripts
 
-## Expanding the ESLint configuration
+```bash
+npm install
+npm run dev      # http://localhost:5173
+npm run build    # production build
+npm run preview  # preview production build
+npm run lint
+```
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+## Environment
+
+Create `frontend/.env`:
+
+```env
+VITE_BASE_URL=http://localhost:5000/api
+VITE_SOCKET_URL=http://localhost:5000
+```
+
+## Key directories
+
+```
+src/
+├── pages/              # Route pages (Meetings, VideoMeeting, UploadRecordings, …)
+├── components/
+│   ├── meetings/       # LiveKit room, control bar, recorder bridge, chat
+│   ├── realtimeRecorder/
+│   └── layout/
+├── context/            # AuthContext, AIContext
+└── utils/              # api.js, uploadMeetingRecording.js, meetingUser.js
+```
+
+## Notable routes
+
+| Path | Component |
+|------|-----------|
+| `/video-meeting/:meetingId` | `VideoMeeting` → `LiveKitMeetingRoom` (no app layout) |
+| `/upload-recordings` | `UploadRecordings` |
+| `/realtime-recorder/:meetingId` | `RealtimeRecorder` |
+| `/meetings/:id/ai` | `MeetingAIPanel` |
+
+## Dependencies (high level)
+
+- **livekit-client** / **@livekit/components-react** — WebRTC video meetings
+- **react-router-dom** — routing
+- **socket.io-client** — realtime features (e.g. realtime recorder)
+- **lucide-react**, **framer-motion**, **recharts** — UI
+
+## Development notes
+
+- Video meetings run outside the main `Layout` (full-screen room).
+- LiveKit recording uses `MeetingRoomRecorderBridge` to composite stage video and mixed audio before upload.
+- API calls use `utils/api.js` with JWT from `localStorage`.
