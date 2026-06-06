@@ -16,6 +16,7 @@ import documentRoutes from "./routes/documentRoutes.js";
 import inviteRoutes from "./routes/inviteRoutes.js";
 import taskRoutes from "./routes/taskRoutes.js";
 import zegoRoutes from './routes/zegoRoutes.js';
+import livekitRoutes from './routes/livekitRoutes.js';
 import recordingRoutes from './routes/recordingRoutes.js';
 import aiRoutes from './routes/aiRoutes.js';
 
@@ -63,6 +64,7 @@ app.use("/api/documents", documentRoutes);
 app.use("/api/invites", inviteRoutes);
 app.use("/api/tasks", taskRoutes);
 app.use("/api/zego", zegoRoutes);
+app.use("/api/livekit", livekitRoutes);
 app.use('/api/recordings', recordingRoutes);
 app.use("/api/ai", aiRoutes);
 

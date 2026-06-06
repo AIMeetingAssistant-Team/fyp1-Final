@@ -75,7 +75,7 @@ export default function Dashboard() {
       const meeting = createRes.meeting;
       
       // Generate ZEGO token but don't navigate yet
-      const tokenRes = await apiRequest(`/zego/meetings/${meeting._id}/token`, 'POST', { role: 'host' }, token);
+      const tokenRes = await apiRequest(`/livekit/meetings/${meeting._id}/token`, 'POST', { role: 'host' }, token);
       
       // Store meeting info for sharing and token data
       setMeetingCreated({

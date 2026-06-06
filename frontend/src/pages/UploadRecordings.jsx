@@ -552,7 +552,7 @@ const UploadRecordings = () => {
       // Call transcription API with summary generation (language set to English)
       const result = await transcribeRecording(meetingId, recordingIndex, {
         generateMinutes: true, // This will generate summary
-        language: 'en', // Ensure English language
+        language: 'en-ur',
         extractTasks: false,   // We can enable this if needed
       });
 

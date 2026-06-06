@@ -1,4 +1,4 @@
-const baseurl = import.meta.env.VITE_BASE_URL;
+const baseurl = (import.meta.env.VITE_BASE_URL || 'http://localhost:5000/api').trim().replace(/\/$/, '');
 
 export async function apiRequest(endpoint, method = "GET", body, token) {
   // Get token from localStorage if not provided

@@ -8,7 +8,18 @@ const loginHistorySchema = new mongoose.Schema({
   },
   action: {
     type: String,
-    enum: ["login", "logout", "password_reset", "login_google"],
+    enum: [
+      "login",
+      "logout",
+      "password_reset",
+      "login_google",
+      "password_change",
+      "account_deactivated",
+      "account_deleted",
+      "instant_meeting_created",
+      "joined_by_code",
+      "copied_meeting_link",
+    ],
     required: true,
   },
   ipAddress: {

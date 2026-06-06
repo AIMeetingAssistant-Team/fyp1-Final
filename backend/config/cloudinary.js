@@ -81,11 +81,13 @@ export const recordingUpload = multer({
   storage: storage,
   fileFilter: (req, file, cb) => {
     const allowedTypes = [
-      'video/mp4', 'video/mpeg', 'video/quicktime', 'video/x-msvideo', 'video/x-matroska', 'audio/webm',
-      'audio/mpeg', 'audio/wav', 'audio/ogg', 'audio/mp3', 'audio/x-m4a', 'audio/aac', 'audio/flac'
+      'video/mp4', 'video/mpeg', 'video/quicktime', 'video/x-msvideo', 'video/x-matroska', 'video/webm',
+      'audio/webm', 'audio/mpeg', 'audio/wav', 'audio/ogg', 'audio/mp3', 'audio/x-m4a', 'audio/aac', 'audio/flac',
     ];
+    const allowedExtensions = ['mp4', 'mpeg', 'mov', 'avi', 'mkv', 'webm', 'mp3', 'wav', 'ogg', 'm4a', 'aac', 'flac'];
+    const ext = path.extname(file.originalname).slice(1).toLowerCase();
 
-    if (allowedTypes.includes(file.mimetype)) {
+    if (allowedTypes.includes(file.mimetype) || allowedExtensions.includes(ext)) {
       cb(null, true);
     } else {
       cb(new Error(`Invalid file type: ${file.mimetype}. Only audio and video files are allowed.`), false);
