@@ -150,10 +150,10 @@ const MeetingAIPanel = () => {
               <p className="font-semibold text-gray-900 capitalize">{meetingData.meetingType}</p>
             </div>
             <div className="bg-gray-50 p-4 rounded-lg">
-              <p className="text-sm text-gray-500">Duration</p>
+              {/* <p className="text-sm text-gray-500">Duration</p>
               <p className="font-semibold text-gray-900">
                 {Math.round((new Date(meetingData.endTime) - new Date(meetingData.startTime)) / 60000)} minutes
-              </p>
+              </p> */}
             </div>
             <div className="bg-gray-50 p-4 rounded-lg">
               <p className="text-sm text-gray-500">Status</p>

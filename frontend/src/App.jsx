@@ -23,6 +23,7 @@ import UploadRecordings from "./pages/UploadRecordings";
 import MeetingAIPanel from "./pages/MeetingAIPanel";
 import Tasks from "./pages/Tasks";
 import JoinMeeting from "./pages/JoinMeeting";
+import AnalyticsDashboard from "./pages/AnalyticsDashboard";
 
 function PrivateRoute({ element }) {
   const { user, loading } = useContext(AuthContext);
@@ -70,14 +71,39 @@ export default function App() {
   return (
     <Router>
       <AIProvider>
-        <Routes>
-          {/* Full-screen video — no sidebar/header/footer */}
-          <Route
-            path="/video-meeting/:meetingId"
-            element={<PrivateRoute element={<VideoMeeting />} />}
-          />
-          <Route path="/*" element={<AppLayout />} />
-        </Routes>
+        <Layout>
+          <Routes>
+            {/* Default / Home */}
+            <Route path="/" element={<Home />} />
+
+            {/* Public Routes */}
+            <Route path="/signup" element={<PublicRoute element={<AuthForm mode="signup" />} />} />
+            <Route path="/signin" element={<PublicRoute element={<AuthForm mode="signin" />} />} />
+            <Route path="/verify-email" element={<PublicRoute element={<VerifyEmail />} />} />
+            <Route path="/forgot-password" element={<PublicRoute element={<ForgotPassword />} />} />
+            <Route path="/reset-password/:token" element={<PublicRoute element={<ResetPassword />} />} />
+
+            {/* Protected Routes */}
+            <Route path="/profile" element={<PrivateRoute element={<ProfilePage />} />} />
+            <Route path="/workspace" element={<PrivateRoute element={<MainWorkspace />} />} />
+            <Route path="/dashboard" element={<PrivateRoute element={<Dashboard />} />} />
+            <Route path="/join" element={<PrivateRoute element={<JoinMeeting />} />} />
+            <Route path="/schedule" element={<PrivateRoute element={<ScheduleMeeting />} />} />
+            <Route path="/meetings" element={<PrivateRoute element={<Meetings />} />} />
+            <Route path="/meetings/:id" element={<PrivateRoute element={<MeetingDetails />} />} />
+            <Route path="/meetings/:id/ai" element={<PrivateRoute element={<MeetingAIPanel />} />} />
+            <Route path="/calendar" element={<PrivateRoute element={<Calendar />} />} />
+            <Route path="/realtime-recording" element={<PrivateRoute element={<RealtimeRecorder />} />} />
+            <Route path="/upload-recordings" element={<PrivateRoute element={<UploadRecordings />} />} />
+            <Route path="/video-meeting/:meetingId" element={<VideoMeeting />} />
+            <Route path="/documents" element={<PrivateRoute element={<DocumentList />} />} />
+            <Route path="/tasks" element={<PrivateRoute element={<Tasks />} />} />
+            <Route path="/analytics" element={<PrivateRoute element={<AnalyticsDashboard />} />} />
+
+            {/* Catch-all redirect to Home */}
+            <Route path="*" element={<Navigate to="/" />} />
+          </Routes>
+        </Layout>
       </AIProvider>
     </Router>
   );

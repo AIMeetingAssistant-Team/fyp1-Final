@@ -19,7 +19,7 @@ import zegoRoutes from './routes/zegoRoutes.js';
 import livekitRoutes from './routes/livekitRoutes.js';
 import recordingRoutes from './routes/recordingRoutes.js';
 import aiRoutes from './routes/aiRoutes.js';
-
+import analyticsRoutes from './routes/analyticsRoutes.js';
 // Socket.IO imports
 import SocketServer from "./socket/socketServer.js";
 // Meeting Service Import
@@ -67,6 +67,7 @@ app.use("/api/zego", zegoRoutes);
 app.use("/api/livekit", livekitRoutes);
 app.use('/api/recordings', recordingRoutes);
 app.use("/api/ai", aiRoutes);
+app.use('/api/analytics', analyticsRoutes);
 
 // --- 404 Handler ---
 app.use((req, res, next) => {
