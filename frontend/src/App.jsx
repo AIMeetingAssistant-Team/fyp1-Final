@@ -23,6 +23,7 @@ import UploadRecordings from "./pages/UploadRecordings";
 import MeetingAIPanel from "./pages/MeetingAIPanel";
 import Tasks from "./pages/Tasks";
 import JoinMeeting from "./pages/JoinMeeting";
+import AnalyticsDashboard from "./pages/AnalyticsDashboard";
 
 function PrivateRoute({ element }) {
   const { user, loading } = useContext(AuthContext);
@@ -67,6 +68,7 @@ export default function App() {
             <Route path="/video-meeting/:meetingId" element={<VideoMeeting />} />
             <Route path="/documents" element={<PrivateRoute element={<DocumentList />} />} />
             <Route path="/tasks" element={<PrivateRoute element={<Tasks />} />} />
+            <Route path="/analytics" element={<PrivateRoute element={<AnalyticsDashboard />} />} />
 
             {/* Catch-all redirect to Home */}
             <Route path="*" element={<Navigate to="/" />} />

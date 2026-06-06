@@ -1095,12 +1095,12 @@ export const generateMinutesPDF = async (req, res) => {
       infoItems.push({ label: 'Type', value: meetingType });
     }
     
-    if (meeting.startTime && meeting.endTime) {
-      const duration = Math.round((new Date(meeting.endTime) - new Date(meeting.startTime)) / 60000);
-      if (duration >= 0) {
-        infoItems.push({ label: 'Duration', value: `${duration} minute${duration !== 1 ? 's' : ''}` });
-      }
-    }
+    // if (meeting.startTime && meeting.endTime) {
+    //   const duration = Math.round((new Date(meeting.endTime) - new Date(meeting.startTime)) / 60000);
+    //   if (duration >= 0) {
+    //     infoItems.push({ label: 'Duration', value: `${duration} minute${duration !== 1 ? 's' : ''}` });
+    //   }
+    // }
     
     if (meeting.host?.name) {
       infoItems.push({ label: 'Host', value: meeting.host.name });
