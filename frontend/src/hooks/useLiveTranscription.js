@@ -7,7 +7,7 @@ import {
 const PCM_CAPTURE_WORKLET_URL = '/worklets/pcmCaptureProcessor.js';
 
 /**
- * Live captions over Socket.IO — does not replace post-recording AI transcription.
+ * Live transcript over Socket.IO (Whisper chunks) — does not replace post-recording AI transcription.
  */
 export function useLiveTranscription({ meetingId, enabled = false, language = 'en-ur' }) {
   const [entries, setEntries] = useState([]);
@@ -43,48 +43,31 @@ export function useLiveTranscription({ meetingId, enabled = false, language = 'e
 
     const socket = acquireTranscriptionSocket(meetingId);
     if (!socket) {
-      setError('Sign in required for live captions.');
+      setError('Sign in required for live transcript.');
       return undefined;
     }
     socketRef.current = socket;
 
     const onStarted = () => {
-      if (enabledRef.current) setIsTranscribing(true);
+      setIsTranscribing(true);
     };
 
     const onPartial = (data) => {
-      if (data.meetingId !== meetingIdRef.current) return;
-      if (!data?.text?.trim()) return;
+      if (String(data.meetingId) !== String(meetingIdRef.current)) return;
 
-      const text = data.text.trim();
-      const speaker = data.speaker || 'You';
-      const lang = data.language || activeLanguageRef.current;
-      setLatestCaption(text);
+      const fullText = data.fullText?.trim();
+      const chunkText = data?.text?.trim();
+      const displayText = fullText || chunkText;
+      if (!displayText) return;
 
-      setEntries((prev) => {
-        const last = prev[prev.length - 1];
-        if (last?.isPartial && last.speaker === speaker) {
-          return [...prev.slice(0, -1), {
-            ...last,
-            text,
-            language: lang,
-            confidence: data.confidence ?? last.confidence,
-            isPartial: true,
-          }];
-        }
-        return [
-          ...prev,
-          {
-            id: `${data.userId || speaker}-${Date.now()}`,
-            speaker,
-            text,
-            language: lang,
-            confidence: data.confidence ?? 0.85,
-            isPartial: true,
-            timestamp: data.timestamp || new Date().toISOString(),
-          },
-        ];
-      });
+      setLatestCaption(displayText);
+
+      setEntries([{
+        id: 'live-transcript',
+        text: displayText,
+        isPartial: data.isPartial === true,
+        timestamp: data.timestamp || new Date().toISOString(),
+      }]);
     };
 
     const onStopped = () => {
@@ -98,7 +81,7 @@ export function useLiveTranscription({ meetingId, enabled = false, language = 'e
     };
 
     const onConnectError = (err) => {
-      setError(err?.message || 'Could not connect to caption server. Is the backend running on port 5000?');
+      setError(err?.message || 'Could not connect to transcription server. Is the backend running on port 5000?');
       setIsTranscribing(false);
     };
 
@@ -110,7 +93,7 @@ export function useLiveTranscription({ meetingId, enabled = false, language = 'e
 
     return () => {
       if (activeRef.current) {
-        socket.emit('transcription:stop', { meetingId: meetingIdRef.current });
+        socket.emit('transcription:stop', { meetingId: String(meetingIdRef.current) });
       }
       socket.off('transcription:started', onStarted);
       socket.off('transcription:partial', onPartial);
@@ -148,7 +131,7 @@ export function useLiveTranscription({ meetingId, enabled = false, language = 'e
     const sampleRate = audioContext.sampleRate;
 
     socketRef.current.emit('transcription:audio-config', {
-      meetingId,
+      meetingId: String(meetingId),
       sampleRate,
       channels: 1,
     });
@@ -162,7 +145,7 @@ export function useLiveTranscription({ meetingId, enabled = false, language = 'e
       if (!activeRef.current || !socketRef.current?.connected) return;
       const int16 = new Int16Array(event.data);
       socketRef.current.emit('transcription:audio-chunk', {
-        meetingId,
+        meetingId: String(meetingId),
         audioData: Array.from(int16),
         sampleRate,
         isFinal: false,
@@ -190,21 +173,24 @@ export function useLiveTranscription({ meetingId, enabled = false, language = 'e
       try {
         stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       } catch {
-        setError('Microphone access is required for live captions.');
+        setError('Microphone access is required for live transcript.');
         return false;
       }
     }
 
-    socketRef.current.emit('transcription:start', { meetingId, language: activeLanguage });
+    socketRef.current.emit('transcription:start', {
+      meetingId: String(meetingId),
+      language: activeLanguageRef.current,
+    });
     await setupAudioStreaming(stream);
     setIsTranscribing(true);
     return true;
-  }, [meetingId, activeLanguage, setupAudioStreaming]);
+  }, [meetingId, setupAudioStreaming]);
 
   const stop = useCallback(() => {
     teardownAudio();
     if (socketRef.current?.connected) {
-      socketRef.current.emit('transcription:stop', { meetingId });
+      socketRef.current.emit('transcription:stop', { meetingId: String(meetingId) });
     }
     setIsTranscribing(false);
     setLatestCaption('');

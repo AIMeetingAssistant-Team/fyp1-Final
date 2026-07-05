@@ -1,19 +1,45 @@
-import { useEffect, useRef } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Languages, Mic, Download } from 'lucide-react';
+import { useEffect, useMemo, useRef } from 'react';
+import { Download } from 'lucide-react';
 
-const LANGUAGE_LABELS = {
-  en: 'English',
-  ur: 'Urdu',
-  'en-ur': 'English + Urdu',
-  auto: 'Auto-detect',
-};
+function mergeTranscriptEntries(entries) {
+  let text = '';
+  let partial = '';
+
+  for (const entry of entries) {
+    const chunk = entry?.text?.trim();
+    if (!chunk) continue;
+
+    if (entry.isPartial) {
+      partial = chunk;
+      continue;
+    }
+
+    if (!text) {
+      text = chunk;
+      continue;
+    }
+    if (chunk.startsWith(text)) {
+      text = chunk;
+      continue;
+    }
+
+    let overlap = 0;
+    const max = Math.min(text.length, chunk.length);
+    for (let i = max; i > 8; i -= 1) {
+      if (text.slice(-i).toLowerCase() === chunk.slice(0, i).toLowerCase()) {
+        overlap = i;
+        break;
+      }
+    }
+    text = overlap ? text + chunk.slice(overlap) : `${text} ${chunk}`;
+  }
+
+  return { text, partial };
+}
 
 export default function LiveTranscriptPanel({
   entries = [],
-  activeLanguage = 'auto',
   isTranscribing = false,
-  onLanguageChange,
   onExport,
   className = '',
   variant = 'default',
@@ -21,87 +47,69 @@ export default function LiveTranscriptPanel({
   const scrollRef = useRef(null);
   const isMeeting = variant === 'meeting';
 
+  const { text, partial } = useMemo(() => mergeTranscriptEntries(entries), [entries]);
+  const hasContent = Boolean(text || partial);
+
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
-  }, [entries]);
+  }, [text, partial]);
 
-  const toolbar = (
-    <div className={isMeeting ? 'meeting-transcript-toolbar' : 'flex items-center justify-between px-4 py-3 border-b border-slate-800'}>
-      <div className="flex items-center gap-2">
-        <Mic className={`w-4 h-4 ${isTranscribing ? 'text-emerald-400 animate-pulse' : isMeeting ? 'text-slate-400' : 'text-slate-400'}`} />
-        {!isMeeting && <h3 className="text-sm font-semibold text-white">Live Transcript</h3>}
-        {isMeeting && <span className="meeting-transcript-toolbar-label">Language</span>}
-      </div>
-      <div className="flex items-center gap-2">
-        <Languages className="w-4 h-4 text-slate-400" />
-        <select
-          value={activeLanguage}
-          onChange={(e) => onLanguageChange?.(e.target.value)}
-          className={isMeeting ? 'meeting-transcript-select' : 'text-xs bg-slate-900 border border-slate-700 rounded px-2 py-1 text-slate-200'}
-        >
-          {Object.entries(LANGUAGE_LABELS).map(([code, label]) => (
-            <option key={code} value={code}>{label}</option>
-          ))}
-        </select>
-        {onExport && (
+  const handleExport = () => {
+    if (onExport) {
+      onExport();
+      return;
+    }
+    const body = [text, partial].filter(Boolean).join(' ').trim();
+    if (!body) return;
+    const blob = new Blob([body], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'live-transcript.txt';
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  return (
+    <div className={`live-transcript-panel ${isMeeting ? 'meeting-variant' : 'recorder-variant'} ${className}`}>
+      <div className="live-transcript-head">
+        <div className="live-transcript-head-left">
+          <span className="live-transcript-title">Transcript</span>
+          {isTranscribing && (
+            <span className="live-transcript-status">
+              <span className="live-transcript-pulse" aria-hidden />
+              Listening
+            </span>
+          )}
+        </div>
+        {hasContent && (
           <button
             type="button"
-            onClick={onExport}
-            className={isMeeting ? 'meeting-transcript-export' : 'p-1.5 rounded hover:bg-slate-800 text-slate-300'}
-            title="Export transcript"
+            onClick={handleExport}
+            className="live-transcript-export-btn"
+            title="Download transcript"
           >
             <Download className="w-4 h-4" />
           </button>
         )}
       </div>
-    </div>
-  );
 
-  const list = (
-    <div ref={scrollRef} className={isMeeting ? 'meeting-transcript-list' : 'flex-1 overflow-y-auto px-4 py-3 space-y-3'}>
-      <AnimatePresence initial={false}>
-        {entries.length === 0 ? (
-          <p className={isMeeting ? 'meeting-transcript-empty' : 'text-sm text-slate-500 text-center mt-8'}>
-            {isTranscribing ? 'Listening for speech...' : 'Start transcription to see live captions'}
+      <div ref={scrollRef} className="live-transcript-body">
+        {!hasContent ? (
+          <p className="live-transcript-placeholder">
+            {isTranscribing ? 'Speech will appear here as it is recognized…' : 'Start transcription to see live text'}
           </p>
         ) : (
-          entries.map((entry) => (
-            <motion.div
-              key={entry.id}
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              className={`transcript-item ${entry.isPartial ? 'partial' : ''}`}
-            >
-              <div className="transcript-meta">
-                <span className="speaker">{entry.speaker}</span>
-                <div className="flex items-center gap-2">
-                  <span className="time">{LANGUAGE_LABELS[entry.language] || entry.language}</span>
-                  <span className="time">{Math.round((entry.confidence || 0) * 100)}%</span>
-                </div>
-              </div>
-              <p className="transcript-text">{entry.text}</p>
-            </motion.div>
-          ))
+          <p className="live-transcript-paragraph">
+            {text}
+            {partial && (
+              <span className="live-transcript-partial">{text ? ` ${partial}` : partial}</span>
+            )}
+          </p>
         )}
-      </AnimatePresence>
-    </div>
-  );
-
-  if (isMeeting) {
-    return (
-      <div className={`live-transcript-panel meeting-variant ${className}`}>
-        {toolbar}
-        {list}
       </div>
-    );
-  }
-
-  return (
-    <div className={`live-transcript-panel flex flex-col h-full bg-slate-950/95 border-l border-slate-800 ${className}`}>
-      {toolbar}
-      {list}
     </div>
   );
 }

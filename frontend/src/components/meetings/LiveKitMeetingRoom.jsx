@@ -99,7 +99,7 @@ export default function LiveKitMeetingRoom({ meetingId }) {
   const [mediaWarning, setMediaWarning] = useState(null);
   const [participantCount, setParticipantCount] = useState(1);
   const [videoLayout, setVideoLayout] = useState('grid');
-  const [captionsOpen, setCaptionsOpen] = useState(false);
+  const [transcriptOpen, setTranscriptOpen] = useState(false);
   const [meetingStartedAt] = useState(() => Date.now());
   const [uploadingRecording, setUploadingRecording] = useState(false);
   /** Visible to all participants when host is recording */
@@ -369,8 +369,8 @@ export default function LiveKitMeetingRoom({ meetingId }) {
     onToggleRecording: toggleRecording,
     layoutMode: videoLayout,
     onLayoutModeChange: setVideoLayout,
-    captionsActive: captionsOpen,
-    onToggleCaptions: () => setCaptionsOpen((v) => !v),
+    transcriptActive: transcriptOpen,
+    onToggleTranscript: () => setTranscriptOpen((v) => !v),
   };
 
   if (loading) {
@@ -492,8 +492,8 @@ export default function LiveKitMeetingRoom({ meetingId }) {
         />
         <LiveKitTranscriptionSession
           meetingId={meetingId}
-          open={captionsOpen}
-          onClose={() => setCaptionsOpen(false)}
+          open={transcriptOpen}
+          onClose={() => setTranscriptOpen(false)}
         />
       </LiveKitRoomShell>
     </div>
