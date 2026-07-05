@@ -1,12 +1,11 @@
 import { AnimatePresence, motion } from 'framer-motion';
 
 /**
- * Google Meet–style bottom captions over video / recorder.
+ * Bottom caption strip — text only, no speaker labels.
  */
 export default function MeetingCaptionsOverlay({
   visible = false,
   text = '',
-  speaker = '',
   isListening = false,
 }) {
   if (!visible) return null;
@@ -27,10 +26,7 @@ export default function MeetingCaptionsOverlay({
             transition={{ duration: 0.2 }}
           >
             {showText ? (
-              <>
-                {speaker ? <span className="vm-captions-speaker">{speaker}</span> : null}
-                <p className="vm-captions-text">{text}</p>
-              </>
+              <p className="vm-captions-text">{text}</p>
             ) : (
               <p className="vm-captions-text vm-captions-text--muted">Listening…</p>
             )}

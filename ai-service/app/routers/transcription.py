@@ -1,4 +1,4 @@
-from fastapi import APIRouter, UploadFile, File, HTTPException
+from fastapi import APIRouter, UploadFile, File, Form, HTTPException
 from fastapi.responses import JSONResponse
 import tempfile
 import os
@@ -47,6 +47,7 @@ async def transcribe_audio_file(
 async def transcribe_audio_chunk(
     file: UploadFile = File(...),
     language: Optional[str] = None,
+    previous_text: Optional[str] = Form(None),
     detect_language: Optional[str] = "true",
 ):
     """Shorter live-caption chunks (same Whisper path as transcribe-file)."""
@@ -63,7 +64,7 @@ async def transcribe_audio_chunk(
             tmp_path = tmp_file.name
 
         try:
-            result = transcription_service.transcribe_audio_file(tmp_path, language)
+            result = transcription_service.transcribe_live_chunk(tmp_path, language, previous_text)
             if not result.get("success"):
                 raise HTTPException(status_code=500, detail=result.get("error", "Transcription failed"))
 

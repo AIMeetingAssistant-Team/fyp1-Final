@@ -17,7 +17,7 @@ import {
   VideoOff,
   LayoutGrid,
   Presentation,
-  Captions,
+  FileText,
 } from 'lucide-react';
 import MediaDevicePicker from './MediaDevicePicker';
 
@@ -78,8 +78,8 @@ export default function MeetingControlBar({
   onToggleRecording,
   layoutMode = 'grid',
   onLayoutModeChange,
-  captionsActive = false,
-  onToggleCaptions,
+  transcriptActive = false,
+  onToggleTranscript,
 }) {
   const layoutContext = useMaybeLayoutContext();
   const chatOpen = layoutContext?.widget.state?.showChat ?? false;
@@ -149,13 +149,13 @@ export default function MeetingControlBar({
           </ToolButton>
 
           <ToolButton
-            label="Captions"
-            active={captionsActive}
-            variant="caption"
-            onClick={onToggleCaptions}
-            title={captionsActive ? 'Turn off live captions' : 'Turn on live captions'}
+            label="Transcript"
+            active={transcriptActive}
+            variant="transcript"
+            onClick={onToggleTranscript}
+            title={transcriptActive ? 'Turn off live transcript' : 'Turn on live transcript'}
           >
-            <Captions size={20} strokeWidth={1.75} />
+            <FileText size={20} strokeWidth={1.75} />
           </ToolButton>
 
           <ToolButton

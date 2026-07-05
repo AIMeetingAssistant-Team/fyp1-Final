@@ -1,5 +1,5 @@
 import { useRef, useState, useEffect } from "react";
-import { Mic, Square, Pause, Play, Captions } from "lucide-react";
+import { Mic, Square, Pause, Play, FileText } from "lucide-react";
 import { motion } from "framer-motion";
 import LiveTranscriptPanel from "../meetings/LiveTranscriptPanel";
 import MeetingCaptionsOverlay from "../meetings/MeetingCaptionsOverlay";
@@ -21,36 +21,25 @@ export default function AudioRecorder({
   const [isPaused, setIsPaused] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
-  const [captionsOpen, setCaptionsOpen] = useState(false);
+  const [transcriptOpen, setTranscriptOpen] = useState(false);
   const timerRef = useRef(null);
-
-  const userName = (() => {
-    try {
-      const u = JSON.parse(localStorage.getItem("user") || "{}");
-      return u?.name || "You";
-    } catch {
-      return "You";
-    }
-  })();
 
   const {
     entries,
     latestCaption,
     isTranscribing,
-    error: captionError,
-    activeLanguage,
-    setActiveLanguage,
-    start: startCaptions,
-    stop: stopCaptions,
+    error: transcriptError,
+    start: startTranscript,
+    stop: stopTranscript,
     setupAudioStreaming,
-    clear: clearCaptions,
+    clear: clearTranscript,
   } = useLiveTranscription({ meetingId, enabled: false, language: "en-ur" });
 
   useEffect(() => {
-    if (captionError) {
-      setMessage({ type: "error", text: captionError });
+    if (transcriptError) {
+      setMessage({ type: "error", text: transcriptError });
     }
-  }, [captionError, setMessage]);
+  }, [transcriptError, setMessage]);
 
   useEffect(() => {
     if (isRecording && !isPaused) {
@@ -64,14 +53,14 @@ export default function AudioRecorder({
     return () => clearInterval(timerRef.current);
   }, [isRecording, isPaused]);
 
-  const toggleCaptions = async () => {
-    if (captionsOpen) {
-      stopCaptions();
-      setCaptionsOpen(false);
+  const toggleTranscript = async () => {
+    if (transcriptOpen) {
+      stopTranscript();
+      setTranscriptOpen(false);
       return;
     }
     if (!isRecording) {
-      setMessage({ type: "error", text: "Start recording before enabling live captions." });
+      setMessage({ type: "error", text: "Start recording before enabling live transcript." });
       return;
     }
     const stream = audioStreamRef.current;
@@ -79,10 +68,10 @@ export default function AudioRecorder({
       setMessage({ type: "error", text: "Microphone not available." });
       return;
     }
-    clearCaptions();
-    const ok = await startCaptions(stream);
+    clearTranscript();
+    const ok = await startTranscript(stream);
     if (ok) {
-      setCaptionsOpen(true);
+      setTranscriptOpen(true);
       await setupAudioStreaming(stream);
     }
   };
@@ -101,8 +90,8 @@ export default function AudioRecorder({
       setIsRecording(true);
       setRecordingTime(0);
       setIsPaused(false);
-      clearCaptions();
-      setCaptionsOpen(false);
+      clearTranscript();
+      setTranscriptOpen(false);
     } catch {
       setMessage({ type: "error", text: "Microphone access denied" });
     }
@@ -124,9 +113,9 @@ export default function AudioRecorder({
 
   const stopRecording = () => {
     if (recorderRef.current && isRecording) {
-      if (captionsOpen) {
-        stopCaptions();
-        setCaptionsOpen(false);
+      if (transcriptOpen) {
+        stopTranscript();
+        setTranscriptOpen(false);
       }
 
       recorderRef.current.stop();
@@ -301,11 +290,10 @@ export default function AudioRecorder({
           </div>
         </div>
 
-        {captionsOpen && (
+        {transcriptOpen && (
           <MeetingCaptionsOverlay
             visible
             text={latestCaption}
-            speaker={userName}
             isListening={isTranscribing}
           />
         )}
@@ -314,54 +302,82 @@ export default function AudioRecorder({
       <div className="flex flex-col items-center gap-4 sm:gap-6">
         <div className="flex items-center justify-center gap-4 sm:gap-6">
           {!isRecording ? (
-            <motion.button
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              onClick={startRecording}
-              className="p-4 sm:p-5 bg-gradient-to-r from-cyan-500 to-cyan-600 hover:from-cyan-600 hover:to-cyan-600 rounded-full shadow-sm transition-all duration-200 group"
-            >
-              <Mic className="w-6 h-6 sm:w-8 sm:h-8 text-white" />
-            </motion.button>
+            <>
+              <div className="flex flex-col items-center gap-1.5">
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={startRecording}
+                  className="p-4 sm:p-5 bg-gradient-to-r from-cyan-500 to-cyan-600 hover:from-cyan-600 hover:to-cyan-600 rounded-full shadow-sm transition-all duration-200 group"
+                >
+                  <Mic className="w-6 h-6 sm:w-8 sm:h-8 text-white" />
+                </motion.button>
+                <span className="text-xs text-gray-500">Record</span>
+              </div>
+              <div className="flex flex-col items-center gap-1.5">
+                <motion.button
+                  whileHover={{ scale: 1.0 }}
+                  whileTap={{ scale: 1.0 }}
+                  disabled
+                  className="p-4 sm:p-5 rounded-full shadow-sm bg-gray-200 cursor-not-allowed opacity-60"
+                  title="Start recording to enable live transcript"
+                >
+                  <FileText className="w-6 h-6 sm:w-8 sm:h-8 text-gray-500" />
+                </motion.button>
+                <span className="text-xs text-gray-400">Transcript</span>
+              </div>
+            </>
           ) : (
             <>
-              {isPaused ? (
+              <div className="flex flex-col items-center gap-1.5">
+                {isPaused ? (
+                  <motion.button
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={resumeRecording}
+                    className="p-4 sm:p-5 bg-cyan-600 hover:bg-cyan-700 rounded-full shadow-sm transition-all duration-200"
+                  >
+                    <Play className="w-6 h-6 sm:w-8 sm:h-8 text-white" />
+                  </motion.button>
+                ) : (
+                  <motion.button
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={pauseRecording}
+                    className="p-4 sm:p-5 bg-yellow-500 hover:bg-yellow-600 rounded-full shadow-sm transition-all duration-200"
+                  >
+                    <Pause className="w-6 h-6 sm:w-8 sm:h-8 text-white" />
+                  </motion.button>
+                )}
+                <span className="text-xs text-gray-500">{isPaused ? 'Resume' : 'Pause'}</span>
+              </div>
+              <div className="flex flex-col items-center gap-1.5">
                 <motion.button
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
-                  onClick={resumeRecording}
-                  className="p-4 sm:p-5 bg-cyan-600 hover:bg-cyan-700 rounded-full shadow-sm transition-all duration-200"
+                  onClick={toggleTranscript}
+                  className={`p-4 sm:p-5 rounded-full shadow-sm transition-all duration-200 ${
+                    transcriptOpen ? 'bg-violet-600 hover:bg-violet-700' : 'bg-purple-500 hover:bg-purple-600'
+                  }`}
+                  title={transcriptOpen ? 'Turn off live transcript' : 'Turn on live transcript'}
                 >
-                  <Play className="w-6 h-6 sm:w-8 sm:h-8 text-white" />
+                  <FileText className="w-6 h-6 sm:w-8 sm:h-8 text-white" />
                 </motion.button>
-              ) : (
+                <span className={`text-xs font-medium ${transcriptOpen ? 'text-violet-600' : 'text-gray-500'}`}>
+                  Transcript
+                </span>
+              </div>
+              <div className="flex flex-col items-center gap-1.5">
                 <motion.button
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
-                  onClick={pauseRecording}
-                  className="p-4 sm:p-5 bg-yellow-500 hover:bg-yellow-600 rounded-full shadow-sm transition-all duration-200"
+                  onClick={stopRecording}
+                  className="p-4 sm:p-5 bg-red-500 hover:bg-red-600 rounded-full shadow-sm transition-all duration-200"
                 >
-                  <Pause className="w-6 h-6 sm:w-8 sm:h-8 text-white" />
+                  <Square className="w-6 h-6 sm:w-8 sm:h-8 text-white" />
                 </motion.button>
-              )}
-              <motion.button
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                onClick={toggleCaptions}
-                className={`p-4 sm:p-5 rounded-full shadow-sm transition-all duration-200 ${
-                  captionsOpen ? 'bg-blue-600 hover:bg-blue-700' : 'bg-purple-500 hover:bg-purple-600'
-                }`}
-                title={captionsOpen ? 'Turn off live captions' : 'Turn on live captions'}
-              >
-                <Captions className="w-6 h-6 sm:w-8 sm:h-8 text-white" />
-              </motion.button>
-              <motion.button
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                onClick={stopRecording}
-                className="p-4 sm:p-5 bg-red-500 hover:bg-red-600 rounded-full shadow-sm transition-all duration-200"
-              >
-                <Square className="w-6 h-6 sm:w-8 sm:h-8 text-white" />
-              </motion.button>
+                <span className="text-xs text-gray-500">Stop</span>
+              </div>
             </>
           )}
         </div>
@@ -373,21 +389,19 @@ export default function AudioRecorder({
               : 'Click microphone to start recording'}
           </p>
           <p className="text-xs text-gray-400">
-            {captionsOpen
-              ? 'Live captions on — full AI transcript still runs after you save'
-              : 'Use the captions button during recording for Google Meet–style live text'}
+            {transcriptOpen
+              ? 'Live transcript on — full AI pipeline still runs after you save'
+              : 'Use the Transcript button during recording for near-real-time Whisper captions'}
           </p>
         </div>
       </div>
 
-      {captionsOpen && (
-        <div className="mt-6 max-h-64 overflow-hidden rounded-lg border border-slate-200 bg-slate-950">
+      {transcriptOpen && (
+        <div className="mt-6 max-h-80 overflow-hidden rounded-xl border border-slate-200 shadow-sm">
           <LiveTranscriptPanel
             entries={entries}
-            activeLanguage={activeLanguage}
             isTranscribing={isTranscribing}
-            onLanguageChange={setActiveLanguage}
-            className="max-h-64"
+            className="max-h-80"
           />
         </div>
       )}
@@ -400,10 +414,10 @@ export default function AudioRecorder({
               {isRecording ? (isPaused ? 'Paused' : 'Recording Active') : 'Ready'}
             </span>
           </div>
-          {captionsOpen && (
+          {transcriptOpen && (
             <div className="flex items-center gap-2">
-              <div className="w-2 h-2 rounded-full bg-purple-500 animate-pulse" />
-              <span className="text-purple-600 font-medium">Live captions</span>
+              <div className="w-2 h-2 rounded-full bg-violet-500 animate-pulse" />
+              <span className="text-violet-600 font-medium">Live transcript</span>
             </div>
           )}
         </div>

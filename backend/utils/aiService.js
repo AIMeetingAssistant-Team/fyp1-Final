@@ -147,13 +147,16 @@ class AIService {
   /**
    * Real-time chunk transcription (lower latency, optimized for streaming)
    */
-  async transcribeStreamChunk(fileBuffer, filename, language = 'auto') {
+  async transcribeStreamChunk(fileBuffer, filename, language = 'auto', previousText = '') {
     try {
       const formData = new FormData();
       const blob = new Blob([fileBuffer], { type: this.getMimeType(filename) });
       formData.append('file', blob, filename);
       if (language && language !== 'auto') {
         formData.append('language', language);
+      }
+      if (previousText) {
+        formData.append('previous_text', previousText.slice(-500));
       }
       formData.append('detect_language', language === 'auto' ? 'true' : 'false');
 
@@ -162,7 +165,7 @@ class AIService {
         formData,
         {
           headers: { 'Content-Type': 'multipart/form-data' },
-          timeout: 120000,
+          timeout: parseInt(process.env.LIVE_TRANSCRIPTION_TIMEOUT_MS || '35000', 10),
         }
       );
 
@@ -171,11 +174,16 @@ class AIService {
         text: response.data.text || '',
         segments: response.data.segments || [],
         language: response.data.language || 'en',
-        confidence: response.data.confidence || 0.85,
+        confidence: response.data.confidence ?? 0.85,
         isPartial: response.data.is_partial ?? true,
       };
     } catch (error) {
-      console.error('Stream chunk transcription failed:', error.message);
+      const isTimeout = error.code === 'ECONNABORTED' || /timeout/i.test(error.message || '');
+      if (isTimeout) {
+        console.warn('Live chunk transcription timed out (chunk skipped, will retry on next interval)');
+      } else {
+        console.error('Stream chunk transcription failed:', error.message);
+      }
       return {
         success: false,
         error: error.message,
