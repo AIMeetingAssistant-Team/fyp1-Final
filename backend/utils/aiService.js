@@ -202,10 +202,12 @@ class AIService {
       // Use the correct endpoint: /generate-summary
       // FastAPI expects form data or JSON body, not query params
       const response = await this.client.post('/api/v1/summarization/generate-summary', {
-        text: text.substring(0, 5000), // Limit to 5000 chars
+        text: text.substring(0, 30000), // Limit to 5000 chars
         meeting_type: meetingType
       });
-      
+      console.log('📝 RAW AI RESPONSE - key_points:', response.data.minutes?.key_points);
+      console.log('📝 RAW AI RESPONSE - key_points length:', response.data.minutes?.key_points?.length);
+      console.log('📝 RAW AI RESPONSE - full response:', JSON.stringify(response.data, null, 2));
       if (!response.data.success) {
         throw new Error(response.data.error || 'Minutes generation failed');
       }

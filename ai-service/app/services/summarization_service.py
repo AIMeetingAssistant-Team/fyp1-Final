@@ -3,6 +3,7 @@ import logging
 from typing import Dict, Any
 import nltk
 
+
 logger = logging.getLogger(__name__)
 
 class SummarizationService:
@@ -78,8 +79,10 @@ class SummarizationService:
         for sentence in sentences:
             sentence = sentence.strip()
             if any(word in sentence.lower() for word in action_words) and len(sentence.split()) > 5:
-                key_points.append(sentence[:100] + "...")
-                if len(key_points) >= 5:
+    # Keep the full sentence; add a period if missing
+                full_sentence = sentence + ("." if not sentence.endswith(".") else "")
+                key_points.append(full_sentence)
+                if len(key_points) >= 10:   # optionally increase the limit
                     break
         
         # Extract decisions

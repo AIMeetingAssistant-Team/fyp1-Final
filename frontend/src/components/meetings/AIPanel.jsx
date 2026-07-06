@@ -659,7 +659,6 @@ const AIPanel = ({ meetingId, meetingData }) => {
                             </span>
                           </div>
                           <div className="flex items-center justify-between text-sm text-gray-600">
-                            <span>Assigned to: {item.assignedTo || 'Unassigned'}</span>
                             {item.deadline && (
                               <span>Deadline: {new Date(item.deadline).toLocaleDateString()}</span>
                             )}

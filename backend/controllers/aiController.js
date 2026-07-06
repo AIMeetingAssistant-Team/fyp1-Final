@@ -442,6 +442,10 @@ async function generateMeetingMinutesAsync(meeting, transcriptionText, extractTa
     if (recordingIndex !== null && meetingDoc.recordings && meetingDoc.recordings[recordingIndex]) {
       const recording = meetingDoc.recordings[recordingIndex];
       
+      // Before saving
+      console.log('💾 SAVING TO DB - keyPoints:', minutesResult.minutes?.key_points);
+      console.log('💾 SAVING TO DB - keyPoints length:', minutesResult.minutes?.key_points?.length);
+
       // Save minutes to recording
       recording.minutesResult = {
         summary: minutesResult.summary || '',
@@ -1394,7 +1398,7 @@ export const generateMinutesPDF = async (req, res) => {
       const tableStartX = 50;
       const tableWidth = doc.page.width - 100;
       const colNumWidth = 25;
-      const colActionWidth = tableWidth - colNumWidth - 80 - 70 - 50; // Remaining space after other columns
+      const colActionWidth = tableWidth - colNumWidth - 50; // Remaining space after other columns
       const colAssignedWidth = 80;
       const colDeadlineWidth = 70;
       const colStatusWidth = 50;
@@ -1414,11 +1418,7 @@ export const generateMinutesPDF = async (req, res) => {
         
         doc.text('#', tableStartX + 5, yPosition + 14);
         doc.text('Action Item', tableStartX + colNumWidth + 5, yPosition + 14);
-        doc.text('Assigned', tableStartX + colNumWidth + colActionWidth + 5, yPosition + 14);
-        doc.text('Deadline', tableStartX + colNumWidth + colActionWidth + colAssignedWidth + 5, yPosition + 14);
-        doc.text('Status', tableStartX + colNumWidth + colActionWidth + colAssignedWidth + colDeadlineWidth + 5, yPosition + 14);
-
-        yPosition += 24;
+        doc.text('Status', tableStartX + colNumWidth + colActionWidth + 5, yPosition + 14);
       };
 
       // Draw initial header
@@ -1452,7 +1452,7 @@ export const generateMinutesPDF = async (req, res) => {
           lineGap: 2
         });
 
-        const rowHeight = Math.max(actionTextHeight, assignedTextHeight, deadlineTextHeight, 18) + rowPadding;
+        const rowHeight = Math.max(actionTextHeight, 18) + rowPadding;
 
         checkPageBreak(rowHeight + 5);
 
@@ -1475,12 +1475,7 @@ export const generateMinutesPDF = async (req, res) => {
           .lineTo(tableStartX + colNumWidth, yPosition + rowHeight)
           .moveTo(tableStartX + colNumWidth + colActionWidth, yPosition)
           .lineTo(tableStartX + colNumWidth + colActionWidth, yPosition + rowHeight)
-          .moveTo(tableStartX + colNumWidth + colActionWidth + colAssignedWidth, yPosition)
-          .lineTo(tableStartX + colNumWidth + colActionWidth + colAssignedWidth, yPosition + rowHeight)
-          .moveTo(tableStartX + colNumWidth + colActionWidth + colAssignedWidth + colDeadlineWidth, yPosition)
-          .lineTo(tableStartX + colNumWidth + colActionWidth + colAssignedWidth + colDeadlineWidth, yPosition + rowHeight)
           .stroke();
-
         // Row number
         doc.fillColor(colors.text)
           .fontSize(9)
@@ -1493,24 +1488,6 @@ export const generateMinutesPDF = async (req, res) => {
           .font('Helvetica')
           .text(actionText, tableStartX + colNumWidth + 5, yPosition + rowPadding, {
             width: colActionWidth - 10,
-            lineGap: 2
-          });
-
-        // Assigned To - with wrapping
-        doc.fillColor(colors.textLight)
-          .fontSize(8)
-          .font('Helvetica')
-          .text(assignedText, tableStartX + colNumWidth + colActionWidth + 5, yPosition + rowPadding, {
-            width: colAssignedWidth - 10,
-            lineGap: 2
-          });
-
-        // Deadline - with wrapping
-        doc.fillColor(colors.textLight)
-          .fontSize(8)
-          .font('Helvetica')
-          .text(deadlineText, tableStartX + colNumWidth + colActionWidth + colAssignedWidth + 5, yPosition + rowPadding, {
-            width: colDeadlineWidth - 10,
             lineGap: 2
           });
 
@@ -1532,13 +1509,12 @@ export const generateMinutesPDF = async (req, res) => {
 
         // Draw status badge background
         doc.fillColor(statusBg)
-          .roundedRect(tableStartX + colNumWidth + colActionWidth + colAssignedWidth + colDeadlineWidth + 3, yPosition + rowPadding - 2, colStatusWidth - 6, 16, 3)
+          .roundedRect(tableStartX + colNumWidth + colActionWidth + 3, yPosition + rowPadding - 2, colStatusWidth - 6, 16, 3)
           .fill();
-        
         doc.fillColor(statusColor)
           .fontSize(8)
           .font('Helvetica-Bold')
-          .text(status, tableStartX + colNumWidth + colActionWidth + colAssignedWidth + colDeadlineWidth + 5, yPosition + rowPadding + 2, {
+          .text(status, tableStartX + colNumWidth + colActionWidth + 5, yPosition + rowPadding + 2, {
             width: colStatusWidth - 10,
             align: 'center'
           });
