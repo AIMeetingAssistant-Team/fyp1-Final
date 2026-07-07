@@ -115,7 +115,7 @@ export function useLiveTranscription({ meetingId, enabled = false, language = 'e
     }
     audioProcessorRef.current = null;
     if (audioContextRef.current) {
-      audioContextRef.current.close().catch(() => {});
+      audioContextRef.current.close().catch(() => { });
       audioContextRef.current = null;
     }
   }, []);
@@ -143,10 +143,9 @@ export function useLiveTranscription({ meetingId, enabled = false, language = 'e
 
     workletNode.port.onmessage = (event) => {
       if (!activeRef.current || !socketRef.current?.connected) return;
-      const int16 = new Int16Array(event.data);
       socketRef.current.emit('transcription:audio-chunk', {
         meetingId: String(meetingId),
-        audioData: Array.from(int16),
+        audioData: event.data,      // raw ArrayBuffer — no Array.from() needed
         sampleRate,
         isFinal: false,
       });

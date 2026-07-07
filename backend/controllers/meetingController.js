@@ -81,7 +81,7 @@ export const createMeeting = async (req, res) => {
           const meetingDoc = await Meeting.findById(meeting._id);
           if (meetingDoc && meetingDoc.recordings?.length > 0) {
             console.log(`🤖 Auto-starting AI processing for meeting: ${meetingDoc.title}`);
-            
+
             // You would call your AI processing function here
             // For example: await processMeetingAI(meetingDoc, req.user.id);
           }
@@ -519,7 +519,10 @@ export const removeParticipant = async (req, res) => {
 export const getCalendar = async (req, res) => {
   try {
     const { month, year } = req.query;
-    const startDate = moment(`${year}-${month}-01`).startOf('month').toDate();
+    const startDate = moment(
+      `${year}-${month}-01`,
+      "YYYY-M-DD"
+    ).startOf("month").toDate();
     const endDate = moment(startDate).endOf('month').toDate();
 
     const meetings = await Meeting.findByDateRange(startDate, endDate, req.user.id);
@@ -859,7 +862,7 @@ export const getMeetingWithAI = async (req, res) => {
         transcription: meeting.transcription,
         minutes: meeting.minutesOfMeeting,
         status: meeting.transcription?.status || 'not_started',
-        canTranscribe: meeting.recordings?.length > 0 && 
+        canTranscribe: meeting.recordings?.length > 0 &&
           meeting.transcription?.status !== 'processing' &&
           meeting.transcription?.status !== 'completed'
       },
